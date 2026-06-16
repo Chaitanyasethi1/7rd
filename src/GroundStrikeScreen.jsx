@@ -19,7 +19,7 @@ const C = {
   textDim:   "#1C2836",
 };
 
-const TARGETS = [
+const INITIAL_TARGETS = [
   { id:"T-031", label:"SUSPECTED COMPOUND", lat:28.6140, lng:77.2110, type:"BUILDING",   conf:94, priority:"PRIORITY 1", threat:"HIGH" },
   { id:"T-033", label:"VEHICLE CONVOY",     lat:28.6190, lng:77.2220, type:"TRUCK",      conf:81, priority:"PRIORITY 2", threat:"MOD"  },
   { id:"T-025", label:"COMM TOWER",         lat:28.6060, lng:77.1980, type:"INFRA",      conf:76, priority:"PRIORITY 3", threat:"LOW"  },
@@ -43,6 +43,17 @@ const MISSION_LOG = [
   { t:"08:28:44", txt:"ANALYST-4: T-021 matches coalition intelligence",       sev:"info"    },
   { t:"08:27:30", txt:"NAG missile payload armed and ready — 2x confirmed",    sev:"danger"  },
 ];
+
+function calcEndPoint(lat, lng, bearingDeg, distMeters) {
+  const R = 6371000;
+  const brg = bearingDeg * Math.PI / 180;
+  const latRads = lat * Math.PI / 180;
+  const lngRads = lng * Math.PI / 180;
+  
+  const lat2 = Math.asin(Math.sin(latRads)*Math.cos(distMeters/R) + Math.cos(latRads)*Math.sin(distMeters/R)*Math.cos(brg));
+  const lng2 = lngRads + Math.atan2(Math.sin(brg)*Math.sin(distMeters/R)*Math.cos(latRads), Math.cos(distMeters/R)-Math.sin(latRads)*Math.sin(lat2));
+  return [lat2*180/Math.PI, lng2*180/Math.PI];
+}
 
 // Helper components
 function HudCorners({ color = C.green, size = 14, thick = 1.5 }) {
@@ -80,8 +91,7 @@ function Pill({ label, color = C.green, pulse = false, small = false }) {
 
 function DR({ label, value, vc = C.textPri }) {
   return (
-    <div style={{ display:"flex", justifyContent:"space-between",
-      padding:"2.5px 0", borderBottom:`1px solid ${C.border}` }}>
+    <div style={{ display:"flex", justifyContent:"space-between", padding:"2.5px 0", borderBottom:`1px solid ${C.border}` }}>
       <span style={{ fontSize:8, fontFamily:"monospace", color:C.textMuted, letterSpacing:.3 }}>{label}</span>
       <span style={{ fontSize:8, fontFamily:"monospace", color:vc, fontWeight:700, letterSpacing:.3 }}>{value}</span>
     </div>
@@ -90,11 +100,8 @@ function DR({ label, value, vc = C.textPri }) {
 
 function SH({ title, right }) {
   return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
-      padding:"5px 9px", background:C.surface2,
-      borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
-      <span style={{ fontSize:8, fontFamily:"monospace", color:C.green,
-        letterSpacing:2, fontWeight:700 }}>{title}</span>
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"5px 9px", background:C.surface2, borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
+      <span style={{ fontSize:8, fontFamily:"monospace", color:C.green, letterSpacing:2, fontWeight:700 }}>{title}</span>
       {right}
     </div>
   );
@@ -102,22 +109,16 @@ function SH({ title, right }) {
 
 function TelemetryPanel({ drone, targets, selectedTarget, setSelectedTarget, lockPhase, setLockPhase }) {
   return (
-    <div style={{ width:240, background:C.surface, borderRight:`1px solid ${C.border}`,
-      display:"flex", flexDirection:"column", flexShrink:0, overflow:"hidden" }}>
-
+    <div style={{ width:240, background:C.surface, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", flexShrink:0, overflow:"hidden" }}>
       <SH title="UAV TELEMETRY" right={<Pill label="LIVE" color={C.green} pulse small />} />
-
       <div style={{ padding:"7px 9px", borderBottom:`1px solid ${C.border}` }}>
-        <div style={{ fontSize:8, fontFamily:"monospace", color:C.green, letterSpacing:.5, marginBottom:5 }}>
-          PLATFORM: {drone.platform}
-        </div>
+        <div style={{ fontSize:8, fontFamily:"monospace", color:C.green, letterSpacing:.5, marginBottom:5 }}>PLATFORM: {drone.platform}</div>
         <DR label="ALTITUDE"   value={`${drone.alt}m (MSL)`} />
         <DR label="SPEED"      value={`${drone.spd} KTS (TAS)`} />
         <DR label="HEADING"    value={`${drone.hdg}° (T)`} />
         <DR label="FUEL"       value={`${drone.fuel}%`} vc={drone.fuel < 40 ? C.red : C.green} />
         <div style={{ marginTop:3, height:2.5, background:C.border }}>
-          <div style={{ height:"100%", width:`${drone.fuel}%`,
-            background:drone.fuel < 40 ? C.red : C.green, transition:"width .5s" }} />
+          <div style={{ height:"100%", width:`${drone.fuel}%`, background:drone.fuel < 40 ? C.red : C.green, transition:"width .5s" }} />
         </div>
         <div style={{ marginTop:5 }} />
         <DR label="ENDURANCE"   value={drone.endurance} />
@@ -128,14 +129,11 @@ function TelemetryPanel({ drone, targets, selectedTarget, setSelectedTarget, loc
 
       <SH title="PRIORITY TARGET" />
       <div style={{ padding:"5px 9px", borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr",
-          fontSize:7, fontFamily:"monospace", color:C.textMuted, letterSpacing:.3, marginBottom:3 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", fontSize:7, fontFamily:"monospace", color:C.textMuted, letterSpacing:.3, marginBottom:3 }}>
           <span>LEVEL</span><span style={{textAlign:"right"}}>PRIOFIR</span>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr",
-          fontSize:8, fontFamily:"monospace", color:C.textPri, fontWeight:700 }}>
-          <span style={{color:C.amber}}>▲ (IA-R902)</span>
-          <span style={{textAlign:"right", color:C.green}}>6.8%</span>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", fontSize:8, fontFamily:"monospace", color:C.textPri, fontWeight:700 }}>
+          <span style={{color:C.amber}}>▲ (IA-R902)</span><span style={{textAlign:"right", color:C.green}}>6.8%</span>
         </div>
       </div>
 
@@ -145,25 +143,15 @@ function TelemetryPanel({ drone, targets, selectedTarget, setSelectedTarget, loc
           const sel = selectedTarget?.id === t.id;
           const tc = t.threat==="HIGH" ? C.red : t.threat==="MOD" ? C.amber : C.greenDim;
           return (
-            <div key={t.id}
-              onClick={() => { setSelectedTarget(t); if(lockPhase==="idle") setLockPhase("select"); }}
-              style={{
-                padding:"5px 9px", cursor:"pointer",
-                background: sel ? `${C.red}14` : "transparent",
-                borderLeft: sel ? `2px solid ${C.red}` : `2px solid transparent`,
-                borderBottom:`1px solid ${C.border}`, animation: sel ? "slide-in .15s ease" : "none",
-              }}>
+            <div key={t.id} onClick={() => { setSelectedTarget(t); if(lockPhase==="idle") setLockPhase("select"); }}
+              style={{ padding:"5px 9px", cursor:"pointer", background: sel ? `${C.red}14` : "transparent",
+                borderLeft: sel ? `2px solid ${C.red}` : `2px solid transparent`, borderBottom:`1px solid ${C.border}`, animation: sel ? "slide-in .15s ease" : "none" }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:1 }}>
-                <span style={{ fontSize:8, fontFamily:"monospace",
-                  color: sel ? C.red : C.textPri, fontWeight:700, letterSpacing:.3 }}>{t.id}</span>
+                <span style={{ fontSize:8, fontFamily:"monospace", color: sel ? C.red : C.textPri, fontWeight:700, letterSpacing:.3 }}>{t.id}</span>
                 <Pill label={t.threat} color={tc} small />
               </div>
-              <div style={{ fontSize:7, fontFamily:"monospace", color:C.textMuted, letterSpacing:.2 }}>
-                {t.label}
-              </div>
-              <div style={{ fontSize:7, fontFamily:"monospace", color:C.amber, marginTop:1 }}>
-                {t.priority}
-              </div>
+              <div style={{ fontSize:7, fontFamily:"monospace", color:C.textMuted, letterSpacing:.2 }}>{t.label}</div>
+              <div style={{ fontSize:7, fontFamily:"monospace", color:C.amber, marginTop:1 }}>{t.priority}</div>
             </div>
           );
         })}
@@ -178,70 +166,71 @@ function TelemetryPanel({ drone, targets, selectedTarget, setSelectedTarget, loc
   );
 }
 
-function MapPanel({ targets, selectedTarget, lockPhase }) {
+function MapPanel({ targets, setTargets, selectedTarget, setSelectedTarget, lockPhase, setLockPhase }) {
   const mapRef   = useRef(null);
   const lMap     = useRef(null);
   const lineRef  = useRef(null);
+  const pulseRef = useRef(null);
+  const lockRingRef = useRef(null);
+  const lockTooltipRef = useRef(null);
+  const explosionRef = useRef(null);
+  const currentTileLayer = useRef(null);
+  const targetMarkers = useRef([]);
+  
+  const [mapLayer, setMapLayer] = useState("SAT");
+  const [customMode, setCustomMode] = useState(false);
+
+  // Enhancement 1: Layer Switcher
+  useEffect(() => {
+    if (!lMap.current) return;
+    if (currentTileLayer.current) {
+      lMap.current.removeLayer(currentTileLayer.current);
+    }
+
+    let url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    let opts = { maxZoom: 19, attribution: 'ESRI World Imagery' };
+
+    if (mapLayer === "TERRAIN") {
+      url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
+    } else if (mapLayer === "OSM") {
+      url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      opts = { maxZoom: 19, subdomains: 'abc', opacity: 0.18 };
+    }
+
+    currentTileLayer.current = L.tileLayer(url, opts).addTo(lMap.current);
+    
+    // Bring markers to front
+    targetMarkers.current.forEach(m => m.setZIndexOffset(1000));
+  }, [mapLayer]);
 
   useEffect(() => {
     if (lMap.current || !mapRef.current) return;
 
-    const map = L.map(mapRef.current, {
-      center: [28.613, 77.207], zoom: 14,
-      zoomControl: false, attributionControl: false,
-    });
+    const map = L.map(mapRef.current, { center: [28.613, 77.207], zoom: 14, zoomControl: false, attributionControl: false });
+    lMap.current = map;
 
-    L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      { maxZoom: 19, attribution:"" }
-    ).addTo(map);
-
-    L.tileLayer(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      { maxZoom: 19, opacity: 0.18, attribution:"" }
-    ).addTo(map);
-
+    // Enhancement 3: Drone SVG with heading rotation + Vector Polyline
     const droneHtml = `
-      <div style="position:relative;">
+      <div style="position:relative; transform: rotate(${OUR_DRONE.hdg}deg);">
         <svg width="26" height="26" viewBox="0 0 26 26">
           <polygon points="13,2 24,23 13,18 2,23" fill="#00FF88" opacity=".9"/>
           <polygon points="13,2 24,23 13,18 2,23" fill="none" stroke="#00FF88" stroke-width="1" opacity=".5"/>
           <circle cx="13" cy="13" r="2.5" fill="#08090C"/>
         </svg>
-        <div style="position:absolute;top:-14px;left:27px;
-          font-family:monospace;font-size:8px;color:#00FF88;white-space:nowrap;
-          background:#08090Cdd;padding:1px 5px;border:1px solid #00FF8855;letter-spacing:.5px;">
-          DELTA-7 | ALT: 340m | SPD: 48kts
-        </div>
+      </div>
+      <div style="position:absolute;top:-14px;left:27px;
+        font-family:monospace;font-size:8px;color:#00FF88;white-space:nowrap;
+        background:#08090Cdd;padding:1px 5px;border:1px solid #00FF8855;letter-spacing:.5px;">
+        DELTA-7 | ALT: 340m | SPD: 48kts
       </div>`;
 
     const droneIcon = L.divIcon({ html:droneHtml, iconSize:[26,26], iconAnchor:[13,13], className:"" });
-    L.marker([28.5960, 77.1870], { icon: droneIcon, zIndexOffset: 1000 }).addTo(map);
+    L.marker([OUR_DRONE.lat, OUR_DRONE.lng], { icon: droneIcon, zIndexOffset: 1000 }).addTo(map);
 
     L.polyline([
-      [28.570,77.158],[28.578,77.167],[28.587,77.174],[28.596,77.187],
-    ], { color:"#00FF88", weight:1.5, dashArray:"6,4", opacity:.6 }).addTo(map);
-
-    targets.forEach(t => {
-      const tc = t.threat==="HIGH" ? "#FF2D2D" : t.threat==="MOD" ? "#FFB300" : "#00CC66";
-      const icon = L.divIcon({
-        html: `<div style="position:relative;">
-          <svg width="22" height="22" viewBox="0 0 22 22">
-            <circle cx="11" cy="11" r="9" fill="none" stroke="${tc}" stroke-width="1.2" stroke-dasharray="3,2" opacity=".8"/>
-            <line x1="11" y1="1" x2="11" y2="21" stroke="${tc}" stroke-width="1.5"/>
-            <line x1="1" y1="11" x2="21" y2="11" stroke="${tc}" stroke-width="1.5"/>
-            <circle cx="11" cy="11" r="2" fill="${tc}"/>
-          </svg>
-          <div style="position:absolute;top:-13px;left:23px;
-            font-family:monospace;font-size:7.5px;color:${tc};white-space:nowrap;
-            background:#08090Cdd;padding:1px 4px;border:1px solid ${tc}55;letter-spacing:.3px;">
-            ${t.id} [${t.type}]
-          </div>
-        </div>`,
-        iconSize:[22,22], iconAnchor:[11,11], className:"",
-      });
-      L.marker([t.lat, t.lng], { icon }).addTo(map);
-    });
+      [OUR_DRONE.lat, OUR_DRONE.lng], 
+      calcEndPoint(OUR_DRONE.lat, OUR_DRONE.lng, OUR_DRONE.hdg, 500)
+    ], { color:'#00FF88', weight:1, opacity:0.4, dashArray:'4 3' }).addTo(map);
 
     const enemyPosIcon = L.divIcon({
       html:`<div style="font-family:monospace;font-size:8px;color:#FF2D2D;
@@ -261,33 +250,207 @@ function MapPanel({ targets, selectedTarget, lockPhase }) {
       L.marker(pos, { icon:icon2 }).addTo(map);
     });
 
-    lMap.current = map;
+    setMapLayer("SAT"); // Trigger first load
   }, []);
 
+  // Update target markers whenever targets change (custom targets)
+  useEffect(() => {
+    if (!lMap.current) return;
+    targetMarkers.current.forEach(m => lMap.current.removeLayer(m));
+    targetMarkers.current = [];
+
+    targets.forEach(t => {
+      const tc = t.threat==="HIGH" ? "#FF2D2D" : t.threat==="MOD" ? "#FFB300" : "#00CC66";
+      const icon = L.divIcon({
+        html: `<div style="position:relative;">
+          <svg width="22" height="22" viewBox="0 0 22 22">
+            <circle cx="11" cy="11" r="9" fill="none" stroke="${tc}" stroke-width="1.2" stroke-dasharray="3,2" opacity=".8"/>
+            <line x1="11" y1="1" x2="11" y2="21" stroke="${tc}" stroke-width="1.5"/>
+            <line x1="1" y1="11" x2="21" y2="11" stroke="${tc}" stroke-width="1.5"/>
+            <circle cx="11" cy="11" r="2" fill="${tc}"/>
+          </svg>
+          <div style="position:absolute;top:-13px;left:23px;
+            font-family:monospace;font-size:7.5px;color:${tc};white-space:nowrap;
+            background:#08090Cdd;padding:1px 4px;border:1px solid ${tc}55;letter-spacing:.3px;">
+            ${t.id} [${t.type}]
+          </div>
+        </div>`,
+        iconSize:[22,22], iconAnchor:[11,11], className:"",
+      });
+      
+      const marker = L.marker([t.lat, t.lng], { icon }).addTo(lMap.current);
+      
+      // Enhancement 2a: Custom Leaflet Popup
+      const popupDiv = document.createElement('div');
+      popupDiv.innerHTML = `
+        <div style="font-family:JetBrains Mono,monospace;font-size:11px;color:#E2EAF4;min-width:180px;">
+          <div style="color:#FFB300;font-weight:700;margin-bottom:6px;">${t.id}</div>
+          <div style="color:#8A9BB5;font-size:10px;">CLASS: <span style="color:#E2EAF4">${t.type}</span></div>
+          <div style="color:#8A9BB5;font-size:10px;">CONF: <span style="color:#FFB300">${t.conf}%</span></div>
+          <div style="color:#8A9BB5;font-size:10px;margin-top:6px;">${t.lat.toFixed(4)}°N  ${t.lng.toFixed(4)}°E</div>
+          <button id="btn-sel-${t.id}" style="margin-top:8px;width:100%;padding:5px;background:#FF3344;border:none;color:#fff;
+            font-family:JetBrains Mono,monospace;font-size:10px;cursor:pointer;letter-spacing:.08em;">
+            SELECT THIS TARGET
+          </button>
+        </div>`;
+      
+      const popup = L.popup({ className:'brahma-popup', closeButton:true, maxWidth:220 }).setContent(popupDiv);
+      marker.bindPopup(popup);
+      
+      // We must attach onclick after popup DOM element is created (or just hook the node)
+      marker.on('popupopen', () => {
+        const btn = document.getElementById(`btn-sel-${t.id}`);
+        if(btn) {
+          btn.onclick = () => {
+            setSelectedTarget(t);
+            if(lockPhase==="idle") setLockPhase("select");
+            lMap.current.closePopup();
+          };
+        }
+      });
+
+      targetMarkers.current.push(marker);
+    });
+  }, [targets]);
+
+  // Selected Target Effects (Pulse, Line, Lock)
   useEffect(() => {
     if (!lMap.current) return;
     if (lineRef.current) { lMap.current.removeLayer(lineRef.current); lineRef.current = null; }
+    if (pulseRef.current) { lMap.current.removeLayer(pulseRef.current); pulseRef.current = null; }
+    if (lockRingRef.current) { lMap.current.removeLayer(lockRingRef.current); lockRingRef.current = null; }
+    if (lockTooltipRef.current) { lMap.current.removeLayer(lockTooltipRef.current); lockTooltipRef.current = null; }
+
     if (!selectedTarget) return;
+
+    // Enh 2b: Target Pulse Ring
+    pulseRef.current = L.circle([selectedTarget.lat, selectedTarget.lng], {
+      radius: 80, color: '#FF3344', weight: 1.5, fillColor: '#FF3344', fillOpacity: 0.1,
+      dashArray: '4 4', className: 'target-pulse-ring'
+    }).addTo(lMap.current);
+
+    // Enh 5: Animated Strike Line
     const col = lockPhase === "locked" || lockPhase === "authorized" ? C.red : C.amber;
     lineRef.current = L.polyline(
-      [[28.5960, 77.1870],[selectedTarget.lat, selectedTarget.lng]],
-      { color:col, weight:1.8, dashArray:"8,5", opacity:.9 }
+      [[OUR_DRONE.lat, OUR_DRONE.lng],[selectedTarget.lat, selectedTarget.lng]],
+      { color:col, weight:2, className: 'animated-strike-line', opacity:.9 }
     ).addTo(lMap.current);
+
+    // Enh 6: Target Lock Cinematic Feedback
+    if (lockPhase === "locked" || lockPhase === "authorized") {
+      if (lockPhase === "locked") {
+        lMap.current.flyTo([selectedTarget.lat, selectedTarget.lng], 16, { duration: 1.5 });
+      }
+
+      lockRingRef.current = L.circle([selectedTarget.lat, selectedTarget.lng], {
+        radius: 150, color: '#FF3344', fillColor: '#FF3344', fillOpacity: 0.08, weight: 2, dashArray: 'none'
+      }).addTo(lMap.current);
+
+      lockTooltipRef.current = L.tooltip([selectedTarget.lat, selectedTarget.lng], {
+        content: "🔒 LOCKED", permanent: true, direction: 'top', className: 'lock-tooltip'
+      }).addTo(lMap.current);
+    }
   }, [selectedTarget, lockPhase]);
+
+  // Enh 7c: Explosion on Authorize
+  useEffect(() => {
+    if (lockPhase === "authorized" && selectedTarget && lMap.current) {
+      if (explosionRef.current) { lMap.current.removeLayer(explosionRef.current); }
+      
+      const exp = L.circle([selectedTarget.lat, selectedTarget.lng], {
+        radius: 40, color: '#FF8800', fillColor: '#FF8800', fillOpacity: 0.6
+      }).addTo(lMap.current);
+      
+      explosionRef.current = exp;
+
+      let op = 0.6;
+      const iv = setInterval(() => {
+        op -= 0.05;
+        if (op <= 0) {
+          clearInterval(iv);
+          lMap.current.removeLayer(exp);
+          explosionRef.current = null;
+        } else {
+          exp.setStyle({ fillOpacity: op, opacity: op });
+        }
+      }, 100);
+
+      return () => clearInterval(iv);
+    }
+  }, [lockPhase]);
+
+  // Enh 4: Custom Target Mode
+  useEffect(() => {
+    if (!lMap.current) return;
+    const map = lMap.current;
+
+    const onMapClick = (e) => {
+      if (!customMode) return;
+      const customTgt = {
+        id: 'CUSTOM-' + Date.now().toString().slice(-4),
+        lat: e.latlng.lat, lng: e.latlng.lng,
+        type: 'CUSTOM POINT', conf: 100, priority: 'MANUAL', threat: 'MOD', label: "USER DESIGNATED"
+      };
+      setTargets(prev => [...prev, customTgt]);
+      setSelectedTarget(customTgt);
+      setLockPhase("select");
+      setCustomMode(false);
+      map.getContainer().style.cursor = '';
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && customMode) {
+        setCustomMode(false);
+        map.getContainer().style.cursor = '';
+      }
+    };
+
+    if (customMode) {
+      map.getContainer().style.cursor = 'crosshair';
+      map.on('click', onMapClick);
+      document.addEventListener('keydown', onKeyDown);
+    } else {
+      map.getContainer().style.cursor = '';
+      map.off('click', onMapClick);
+      document.removeEventListener('keydown', onKeyDown);
+    }
+
+    return () => {
+      map.off('click', onMapClick);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [customMode]);
 
   return (
     <div style={{ flex:1, position:"relative" }}>
       <div ref={mapRef} style={{ width:"100%", height:"100%" }} />
+      
+      {customMode && (
+        <div style={{ position:"absolute", top:50, left:"50%", transform:"translateX(-50%)", zIndex:2000, 
+          background:C.bg, color:C.amber, border:`1px solid ${C.amber}`, padding:"4px 12px", 
+          fontFamily:"monospace", fontSize:11, pointerEvents:"none", animation:"blink-warn 1s step-end infinite" }}>
+          CLICK MAP TO PLACE CUSTOM TARGET — ESC to cancel
+        </div>
+      )}
+
       <div style={{ position:"absolute", top:8, right:8, zIndex:1000, display:"flex", gap:3 }}>
-        {["SAT","OSM","HYBRID"].map((l,i) => (
-          <button key={l} style={{
+        {["SAT","TERRAIN","OSM"].map((l) => (
+          <button key={l} onClick={() => setMapLayer(l)} style={{
             padding:"3px 7px", fontFamily:"monospace", fontSize:7.5,
-            background: i===0 ? `${C.green}22` : `${C.bg}cc`,
-            border:`1px solid ${i===0 ? C.green : C.border}`,
-            color:i===0 ? C.green : C.textMuted, cursor:"pointer", letterSpacing:.8,
+            background: mapLayer===l ? `${C.green}22` : `${C.bg}cc`,
+            border:`1px solid ${mapLayer===l ? C.green : C.border}`,
+            color:mapLayer===l ? C.green : C.textMuted, cursor:"pointer", letterSpacing:.8,
           }}>{l}</button>
         ))}
+        {/* Enh 4 Button */}
+        <button id="map-btn-custom" onClick={() => setCustomMode(true)} style={{
+          padding:"3px 7px", fontFamily:"monospace", fontSize:7.5, marginLeft: 8,
+          background: customMode ? `${C.amber}22` : `${C.bg}cc`,
+          border:`1px solid ${customMode ? C.amber : C.border}`,
+          color:customMode ? C.amber : C.textMuted, cursor:"pointer", letterSpacing:.8,
+        }}>+ CUSTOM</button>
       </div>
+
       <div style={{ position:"absolute", top:8, left:8, zIndex:1000,
         background:`${C.bg}ee`, border:`1px solid ${C.border}`,
         padding:"6px 9px", fontFamily:"monospace" }}>
@@ -325,23 +488,58 @@ function MapPanel({ targets, selectedTarget, lockPhase }) {
 function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
   const [swipeX, setSwipeX] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [authExpired, setAuthExpired] = useState(false);
   const sliderRef = useRef(null);
+  const swipeTimeout = useRef(null);
+  
   const etaSecs = useRef(154);
   const [eta, setEta] = useState("00:02:34");
 
-  const onMD = (e) => { setDragging(true); e.preventDefault(); };
-  const onMM = useCallback((e) => {
+  // Enh 7b: Reset Timer logic
+  const resetSwipe = useCallback(() => {
+    setSwipeX(0);
+    setDragging(false);
+    setAuthExpired(true);
+    setTimeout(() => setAuthExpired(false), 2000);
+  }, []);
+
+  const handleStart = (e) => {
+    e.preventDefault();
+    if (lockPhase === "authorized") return;
+    setDragging(true);
+    if (swipeTimeout.current) clearTimeout(swipeTimeout.current);
+    swipeTimeout.current = setTimeout(resetSwipe, 5000);
+  };
+
+  const handleMove = useCallback((clientX) => {
     if (!dragging || !sliderRef.current) return;
     const rect = sliderRef.current.getBoundingClientRect();
-    const x = Math.min(Math.max(e.clientX - rect.left - 14, 0), rect.width - 30);
+    const x = Math.min(Math.max(clientX - rect.left - 14, 0), rect.width - 30);
     setSwipeX(x);
     if (x >= rect.width - 34) {
+      if (swipeTimeout.current) clearTimeout(swipeTimeout.current);
       setLockPhase("authorized");
       setDragging(false);
       setSwipeX(0);
     }
-  }, [dragging]);
-  const onMU = () => { setDragging(false); if(lockPhase!=="authorized") setSwipeX(0); };
+  }, [dragging, setLockPhase]);
+
+  const handleEnd = () => {
+    if (!dragging) return;
+    setDragging(false);
+    if (lockPhase !== "authorized") {
+      setSwipeX(0);
+      if (swipeTimeout.current) clearTimeout(swipeTimeout.current);
+    }
+  };
+
+  // Bind Mouse & Touch events (Enh 7a)
+  const onMD = (e) => handleStart(e);
+  const onMM = (e) => handleMove(e.clientX);
+  const onMU = () => handleEnd();
+  const onTS = (e) => handleStart(e);
+  const onTM = (e) => handleMove(e.touches[0].clientX);
+  const onTE = () => handleEnd();
 
   useEffect(() => {
     if (lockPhase !== "authorized") return;
@@ -363,68 +561,44 @@ function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
   }, []);
 
   return (
-    <div onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}
+    <div onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU} onTouchMove={onTM} onTouchEnd={onTE}
       style={{ width:280, background:C.surface, borderLeft:`1px solid ${C.border}`,
         display:"flex", flexDirection:"column", flexShrink:0, overflow:"hidden" }}>
 
       <SH title="EO/IR CAM — IA-R902" right={<Pill label="LIVE" color={C.red} pulse small />} />
       <div style={{ height:136, background:"#000", position:"relative", flexShrink:0 }}>
-        <div style={{ width:"100%", height:"100%", position:"relative", overflow:"hidden",
-          background:"radial-gradient(ellipse at 40% 55%, #152215 0%, #030503 75%)" }}>
+        <div style={{ width:"100%", height:"100%", position:"relative", overflow:"hidden", background:"radial-gradient(ellipse at 40% 55%, #152215 0%, #030503 75%)" }}>
           <HudCorners color={C.green} size={11} thick={1.5} />
-          <div style={{ position:"absolute", top:`${scan}%`, left:0, right:0,
-            height:1, background:`${C.green}22`, pointerEvents:"none" }} />
-          <svg style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)"}}
-            width="64" height="64" viewBox="0 0 64 64">
+          <div style={{ position:"absolute", top:`${scan}%`, left:0, right:0, height:1, background:`${C.green}22`, pointerEvents:"none" }} />
+          <svg style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)"}} width="64" height="64" viewBox="0 0 64 64">
             <circle cx="32" cy="32" r="14" fill="none" stroke={C.green} strokeWidth="0.8" opacity=".6"/>
             <line x1="32" y1="2"  x2="32" y2="22" stroke={C.green} strokeWidth="0.8" opacity=".6"/>
             <line x1="32" y1="42" x2="32" y2="62" stroke={C.green} strokeWidth="0.8" opacity=".6"/>
             <line x1="2"  y1="32" x2="22" y2="32" stroke={C.green} strokeWidth="0.8" opacity=".6"/>
             <line x1="42" y1="32" x2="62" y2="32" stroke={C.green} strokeWidth="0.8" opacity=".6"/>
-            {(lockPhase==="locked"||lockPhase==="authorized") && (
-              <circle cx="32" cy="32" r="6" fill="none" stroke={C.red} strokeWidth="1.5" opacity=".9"/>
-            )}
+            {(lockPhase==="locked"||lockPhase==="authorized") && <circle cx="32" cy="32" r="6" fill="none" stroke={C.red} strokeWidth="1.5" opacity=".9"/>}
           </svg>
           {(lockPhase==="locked"||lockPhase==="authorized") && (
-            <div style={{ position:"absolute", top:4, left:0, right:0, textAlign:"center",
-              fontFamily:"monospace", fontSize:7, color:C.red, letterSpacing:1, fontWeight:700,
-              animation:"blink-warn 0.8s step-end infinite" }}>
+            <div style={{ position:"absolute", top:4, left:0, right:0, textAlign:"center", fontFamily:"monospace", fontSize:7, color:C.red, letterSpacing:1, fontWeight:700, animation:"blink-warn 0.8s step-end infinite" }}>
               ⊗ TARGET ACQUIRED — {selectedTarget?.id}
             </div>
           )}
-          <div style={{ position:"absolute", bottom:4, left:0, right:0,
-            display:"flex", justifyContent:"space-around", padding:"0 8px",
-            fontFamily:"monospace", fontSize:6.5, color:C.green, letterSpacing:.3 }}>
+          <div style={{ position:"absolute", bottom:4, left:0, right:0, display:"flex", justifyContent:"space-around", padding:"0 8px", fontFamily:"monospace", fontSize:6.5, color:C.green, letterSpacing:.3 }}>
             <span>ZOOM 25X</span><span>AZ 095°</span><span>EL -12°</span><span>IR/EO</span>
           </div>
         </div>
       </div>
 
       <SH title="SAR IMAGERY" />
-      <div style={{ height:80, flexShrink:0, background:"#070D07", position:"relative",
-        overflow:"hidden",
-        backgroundImage:"repeating-linear-gradient(0deg,transparent,transparent 6px,#0A120A 6px,#0A120A 7px)" }}>
+      <div style={{ height:80, flexShrink:0, background:"#070D07", position:"relative", overflow:"hidden", backgroundImage:"repeating-linear-gradient(0deg,transparent,transparent 6px,#0A120A 6px,#0A120A 7px)" }}>
         <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)" }}>
-          <div style={{ width:55, height:44, border:`1px dashed ${C.amber}88`,
-            background:`${C.amber}06`, position:"relative" }}>
-            {selectedTarget && (
-              <div style={{ position:"absolute", inset:-1, border:`1px solid ${C.amber}`,
-                animation:"blink-warn 1.5s step-end infinite" }} />
-            )}
+          <div style={{ width:55, height:44, border:`1px dashed ${C.amber}88`, background:`${C.amber}06`, position:"relative" }}>
+            {selectedTarget && <div style={{ position:"absolute", inset:-1, border:`1px solid ${C.amber}`, animation:"blink-warn 1.5s step-end infinite" }} />}
           </div>
         </div>
-        <div style={{ position:"absolute", bottom:4, left:5,
-          fontFamily:"monospace", fontSize:7, color:C.amber }}>
-          {selectedTarget ? `${selectedTarget.label}` : "NO TARGET SELECTED"}
-        </div>
-        <div style={{ position:"absolute", bottom:4, right:5,
-          fontFamily:"monospace", fontSize:7, color:C.textMuted }}>
-          {selectedTarget?.id || "---"}
-        </div>
-        <div style={{ position:"absolute", top:4, right:5,
-          fontFamily:"monospace", fontSize:6.5, color:C.textMuted }}>
-          10m RES
-        </div>
+        <div style={{ position:"absolute", bottom:4, left:5, fontFamily:"monospace", fontSize:7, color:C.amber }}>{selectedTarget ? `${selectedTarget.label}` : "NO TARGET SELECTED"}</div>
+        <div style={{ position:"absolute", bottom:4, right:5, fontFamily:"monospace", fontSize:7, color:C.textMuted }}>{selectedTarget?.id || "---"}</div>
+        <div style={{ position:"absolute", top:4, right:5, fontFamily:"monospace", fontSize:6.5, color:C.textMuted }}>10m RES</div>
       </div>
 
       {selectedTarget ? (
@@ -438,32 +612,23 @@ function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
             <DR label="CONFIDENCE"     value={`${selectedTarget.conf}%`} vc={selectedTarget.conf > 85 ? C.green : C.amber} />
             <DR label="PRIORITY"       value={selectedTarget.priority} vc={C.amber} />
             <div style={{ marginTop:3.5, height:2.5, background:C.border }}>
-              <div style={{ height:"100%", width:`${selectedTarget.conf}%`,
-                background:selectedTarget.conf>85 ? C.green : C.amber, transition:"width .4s" }} />
+              <div style={{ height:"100%", width:`${selectedTarget.conf}%`, background:selectedTarget.conf>85 ? C.green : C.amber, transition:"width .4s" }} />
             </div>
           </div>
         </>
       ) : (
-        <div style={{ padding:"10px 9px", borderBottom:`1px solid ${C.border}`, flexShrink:0,
-          fontFamily:"monospace", fontSize:8, color:C.textMuted, textAlign:"center" }}>
-          NO TARGET SELECTED<br/>
-          <span style={{fontSize:7, color:C.textDim}}>SELECT FROM LIST OR MAP</span>
+        <div style={{ padding:"10px 9px", borderBottom:`1px solid ${C.border}`, flexShrink:0, fontFamily:"monospace", fontSize:8, color:C.textMuted, textAlign:"center" }}>
+          NO TARGET SELECTED<br/><span style={{fontSize:7, color:C.textDim}}>SELECT FROM LIST OR MAP</span>
         </div>
       )}
 
       {lockPhase==="locked" && (
-        <div style={{ background:`${C.amber}18`, borderTop:`1px solid ${C.amber}44`,
-          borderBottom:`1px solid ${C.amber}44`, padding:"4px 9px", flexShrink:0,
-          fontFamily:"monospace", fontSize:7.5, color:C.amber, letterSpacing:.8, textAlign:"center",
-          animation:"blink-warn 1.4s step-end infinite" }}>
+        <div style={{ background:`${C.amber}18`, borderTop:`1px solid ${C.amber}44`, borderBottom:`1px solid ${C.amber}44`, padding:"4px 9px", flexShrink:0, fontFamily:"monospace", fontSize:7.5, color:C.amber, letterSpacing:.8, textAlign:"center", animation:"blink-warn 1.4s step-end infinite" }}>
           ⚠ TARGET LOCKED — AWAITING AUTHORIZATION
         </div>
       )}
       {lockPhase==="authorized" && (
-        <div style={{ background:`${C.red}18`, borderTop:`1px solid ${C.red}44`,
-          borderBottom:`1px solid ${C.red}44`, padding:"4px 9px", flexShrink:0,
-          fontFamily:"monospace", fontSize:7.5, color:C.red, letterSpacing:.8, textAlign:"center",
-          animation:"blink-warn 0.7s step-end infinite" }}>
+        <div style={{ background:`${C.red}18`, borderTop:`1px solid ${C.red}44`, borderBottom:`1px solid ${C.red}44`, padding:"4px 9px", flexShrink:0, fontFamily:"monospace", fontSize:7.5, color:C.red, letterSpacing:.8, textAlign:"center", animation:"blink-warn 0.7s step-end infinite" }}>
           ● STRIKE AUTHORIZED — DELTA-7 INBOUND
         </div>
       )}
@@ -471,52 +636,35 @@ function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
       <div style={{ padding:"9px", display:"flex", flexDirection:"column", gap:6, flexShrink:0 }}>
         {lockPhase==="authorized" ? (
           <div style={{ textAlign:"center" }}>
-            <div style={{ fontSize:7.5, fontFamily:"monospace", color:C.textMuted,
-              letterSpacing:.5, marginBottom:4 }}>GNSS AUTONOMOUS MODE — IMPACT IMMINENT</div>
-            <div style={{ fontSize:26, fontFamily:"monospace", color:C.red,
-              fontWeight:900, letterSpacing:3, animation:"blink-warn 1s step-end infinite" }}>{eta}</div>
-            <div style={{ fontSize:7, fontFamily:"monospace", color:C.textMuted,
-              letterSpacing:1, marginTop:2 }}>ETA TO TARGET</div>
+            <div style={{ fontSize:7.5, fontFamily:"monospace", color:C.textMuted, letterSpacing:.5, marginBottom:4 }}>GNSS AUTONOMOUS MODE — IMPACT IMMINENT</div>
+            <div style={{ fontSize:26, fontFamily:"monospace", color:C.red, fontWeight:900, letterSpacing:3, animation:"blink-warn 1s step-end infinite" }}>{eta}</div>
+            <div style={{ fontSize:7, fontFamily:"monospace", color:C.textMuted, letterSpacing:1, marginTop:2 }}>ETA TO TARGET</div>
             <button onClick={() => { setLockPhase("idle"); etaSecs.current = 154; setEta("00:02:34"); }}
-              style={{ marginTop:8, padding:"5px 12px", background:"transparent",
-                border:`1px solid ${C.border}`, color:C.textMuted, fontFamily:"monospace",
-                fontSize:7.5, cursor:"pointer", letterSpacing:1 }}>✕ ABORT MISSION</button>
+              style={{ marginTop:8, padding:"5px 12px", background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, fontFamily:"monospace", fontSize:7.5, cursor:"pointer", letterSpacing:1 }}>✕ ABORT MISSION</button>
           </div>
         ) : !selectedTarget ? (
-          <div style={{ fontFamily:"monospace", fontSize:7.5, color:C.textMuted, textAlign:"center" }}>
-            ← SELECT TARGET
-          </div>
+          <div style={{ fontFamily:"monospace", fontSize:7.5, color:C.textMuted, textAlign:"center" }}>← SELECT TARGET</div>
         ) : lockPhase==="select" ? (
-          <button onClick={() => setLockPhase("locked")} style={{
-            padding:"9px 0", background:`${C.amber}18`,
-            border:`1px solid ${C.amber}`, color:C.amber,
-            fontFamily:"monospace", fontSize:9, cursor:"pointer",
-            letterSpacing:1.5, fontWeight:700,
-          }}>⊙ INITIATE TARGET LOCK</button>
+          <button onClick={() => setLockPhase("locked")} style={{ padding:"9px 0", background:`${C.amber}18`, border:`1px solid ${C.amber}`, color:C.amber, fontFamily:"monospace", fontSize:9, cursor:"pointer", letterSpacing:1.5, fontWeight:700 }}>
+            ⊙ INITIATE TARGET LOCK
+          </button>
         ) : lockPhase==="locked" ? (
           <>
-            <div style={{ fontFamily:"monospace", fontSize:7, color:C.textMuted,
-              textAlign:"center", letterSpacing:.5 }}>DRAG SLIDER TO AUTHORIZE STRIKE</div>
-            <div ref={sliderRef}
-              style={{ height:34, background:`${C.red}12`, border:`1px solid ${C.red}66`,
-                position:"relative", cursor:"ew-resize", overflow:"hidden" }}>
-              <div style={{ position:"absolute", top:0, left:0, height:"100%",
-                width:swipeX+30, background:`${C.red}20`, pointerEvents:"none" }} />
-              <div onMouseDown={onMD} style={{
+            <div style={{ fontFamily:"monospace", fontSize:7, color:C.textMuted, textAlign:"center", letterSpacing:.5 }}>DRAG SLIDER TO AUTHORIZE STRIKE</div>
+            <div ref={sliderRef} style={{ height:34, background:`${C.red}12`, border:`1px solid ${C.red}66`, position:"relative", cursor:"ew-resize", overflow:"hidden" }}>
+              <div style={{ position:"absolute", top:0, left:0, height:"100%", width:swipeX+30, background:`${C.red}20`, pointerEvents:"none" }} />
+              <div onMouseDown={onMD} onTouchStart={onTS} style={{
                 position:"absolute", top:3, left:swipeX+3, width:28, height:28,
                 background:C.red, display:"flex", alignItems:"center", justifyContent:"center",
-                cursor:"grab", userSelect:"none", fontSize:13,
+                cursor:"grab", userSelect:"none", fontSize:13, touchAction: 'none'
               }}>🔒</div>
-              <div style={{ position:"absolute", inset:0, display:"flex",
-                alignItems:"center", justifyContent:"center",
-                fontFamily:"monospace", fontSize:7, color:`${C.red}66`,
-                letterSpacing:1, pointerEvents:"none" }}>SLIDE TO AUTHORIZE</div>
+              <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"monospace", fontSize:7, color:`${C.red}66`, letterSpacing:1, pointerEvents:"none" }}>
+                {authExpired ? "AUTHORIZATION EXPIRED" : "SLIDE TO AUTHORIZE"}
+              </div>
             </div>
-            <button onClick={() => setLockPhase("select")} style={{
-              padding:"5px", background:"transparent",
-              border:`1px solid ${C.border}`, color:C.textMuted,
-              fontFamily:"monospace", fontSize:7.5, cursor:"pointer", letterSpacing:1,
-            }}>✕ CANCEL LOCK</button>
+            <button onClick={() => setLockPhase("select")} style={{ padding:"5px", background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, fontFamily:"monospace", fontSize:7.5, cursor:"pointer", letterSpacing:1 }}>
+              ✕ CANCEL LOCK
+            </button>
           </>
         ) : null}
       </div>
@@ -526,14 +674,8 @@ function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
         {missionLog.map((e,i) => {
           const col = e.sev==="danger" ? C.red : e.sev==="warning" ? C.amber : C.greenDim;
           return (
-            <div key={i} style={{
-              padding:"3.5px 9px",
-              borderLeft:`2px solid ${i===0 ? col : "transparent"}`,
-              borderBottom:`1px solid ${C.border}18`,
-            }}>
-              <span style={{ fontFamily:"monospace", fontSize:7, color:col }}>
-                [{e.t}]&nbsp;
-              </span>
+            <div key={i} style={{ padding:"3.5px 9px", borderLeft:`2px solid ${i===0 ? col : "transparent"}`, borderBottom:`1px solid ${C.border}18` }}>
+              <span style={{ fontFamily:"monospace", fontSize:7, color:col }}>[{e.t}]&nbsp;</span>
               <span style={{ fontFamily:"monospace", fontSize:7, color:C.textPri }}>{e.txt}</span>
             </div>
           );
@@ -541,20 +683,15 @@ function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
       </div>
 
       <div style={{ display:"flex", borderTop:`1px solid ${C.border}`, flexShrink:0 }}>
-        <input placeholder="SEND MESSAGE..." style={{
-          flex:1, background:"transparent", border:"none", outline:"none",
-          padding:"5px 9px", fontFamily:"monospace", fontSize:8, color:C.textPri,
-          caretColor:C.green,
-        }} />
-        <button style={{ padding:"0 10px", background:"transparent",
-          border:"none", borderLeft:`1px solid ${C.border}`,
-          color:C.green, fontFamily:"monospace", fontSize:10, cursor:"pointer" }}>▶</button>
+        <input placeholder="SEND MESSAGE..." style={{ flex:1, background:"transparent", border:"none", outline:"none", padding:"5px 9px", fontFamily:"monospace", fontSize:8, color:C.textPri, caretColor:C.green }} />
+        <button style={{ padding:"0 10px", background:"transparent", border:"none", borderLeft:`1px solid ${C.border}`, color:C.green, fontFamily:"monospace", fontSize:10, cursor:"pointer" }}>▶</button>
       </div>
     </div>
   );
 }
 
 export default function GroundStrikeScreen() {
+  const [targets, setTargets] = useState(INITIAL_TARGETS);
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [lockPhase, setLockPhase] = useState("idle");
 
@@ -566,11 +703,15 @@ export default function GroundStrikeScreen() {
   return (
     <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}>
       <TelemetryPanel
-        drone={OUR_DRONE} targets={TARGETS}
+        drone={OUR_DRONE} targets={targets}
         selectedTarget={selectedTarget} setSelectedTarget={setSelectedTarget}
         lockPhase={lockPhase} setLockPhase={setLockPhase}
       />
-      <MapPanel targets={TARGETS} selectedTarget={selectedTarget} lockPhase={lockPhase} />
+      <MapPanel 
+        targets={targets} setTargets={setTargets}
+        selectedTarget={selectedTarget} setSelectedTarget={setSelectedTarget} 
+        lockPhase={lockPhase} setLockPhase={setLockPhase} 
+      />
       <RightPanel
         selectedTarget={selectedTarget}
         lockPhase={lockPhase} setLockPhase={setLockPhase}

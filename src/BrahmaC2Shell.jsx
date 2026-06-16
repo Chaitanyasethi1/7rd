@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import GroundStrikeScreen from './GroundStrikeScreen';
 import OverviewScreen from './OverviewScreen';
 import StrikePortalAir from './StrikePortalAir';
+import LiveVideoPanel from './LiveVideoPanel';
+import Sidebar from './Sidebar';
 
 const C = {
   bg:        "#08090C",
@@ -20,7 +22,15 @@ const C = {
   textDim:   "#1C2836",
 };
 
-function TopBar({ screen, setScreen, utcTime }) {
+const SCREEN_LABELS = {
+  'overview': 'OVERVIEW',
+  'ground': 'STRIKE — GROUND TARGET',
+  'air': 'STRIKE — AIR INTERCEPT',
+  'video': 'VIDEO FEEDS',
+  'system': 'SYSTEM STATUS'
+};
+
+function TopBar({ screen, utcTime }) {
   return (
     <div style={{ height:34, background:C.surface, borderBottom:`1px solid ${C.border}`,
       display:"flex", alignItems:"center", padding:"0 10px", flexShrink:0, gap:16, WebkitAppRegion: 'drag' }}>
@@ -48,23 +58,17 @@ function TopBar({ screen, setScreen, utcTime }) {
       ))}
 
       <div style={{ flex:1 }} />
+      
+      {/* Active Screen Breadcrumb */}
+      <span id="active-screen-label" style={{
+        fontFamily:"'Barlow Condensed', sans-serif", fontSize:13, color:"#8A9BB5",
+        textTransform:"uppercase", letterSpacing:"0.1em", position:"absolute", left:"50%", transform:"translateX(-50%)"
+      }}>
+        {SCREEN_LABELS[screen]}
+      </span>
 
       <div style={{ fontFamily:"monospace", fontSize:9, color:C.green, letterSpacing:1.5 }}>
         UTC: <span style={{fontWeight:900}}>{utcTime}</span>
-      </div>
-
-      <div style={{ width:1, height:16, background:C.border }} />
-
-      <div style={{ display: 'flex', gap: 4, WebkitAppRegion: 'no-drag' }}>
-        {[["OVERVIEW","overview"],["STRIKE — GROUND","ground"],["AIR INTERCEPT","air"]].map(([l,k]) => (
-          <button key={k} onClick={() => setScreen(k)} style={{
-            padding:"3px 9px",
-            background: screen===k ? `${C.green}1A` : "transparent",
-            border: screen===k ? `1px solid ${C.green}55` : `1px solid ${C.border}`,
-            color: screen===k ? C.green : C.textMuted,
-            fontFamily:"monospace", fontSize:8, letterSpacing:1, cursor:"pointer", borderRadius:1,
-          }}>{l}</button>
-        ))}
       </div>
     </div>
   );
@@ -110,14 +114,19 @@ export default function AppShell() {
       display:"flex", flexDirection:"column", overflow:"hidden", color:C.textPri }}>
       
       {/* Top Bar Navigation */}
-      <TopBar screen={screen} setScreen={setScreen} utcTime={utcTime} />
+      <TopBar screen={screen} utcTime={utcTime} />
       <ThreatBar />
 
       {/* Main Content */}
       <div style={{ flex:1, display:"flex", overflow:"hidden", minHeight:0 }}>
-        {screen==="overview" && <OverviewScreen />}
-        {screen==="air"      && <StrikePortalAir />}
-        {screen==="ground"   && <GroundStrikeScreen />}
+        <Sidebar screen={screen} setScreen={setScreen} />
+        
+        <div style={{ flex:1, display:"flex", overflow:"hidden", position:"relative" }}>
+          {screen==="overview" && <OverviewScreen setScreen={setScreen} />}
+          {screen==="air"      && <StrikePortalAir />}
+          {screen==="ground"   && <GroundStrikeScreen />}
+        </div>
+        <LiveVideoPanel />
       </div>
     </div>
   );
