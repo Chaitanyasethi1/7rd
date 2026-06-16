@@ -1,303 +1,124 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Grid, 
-  Crosshair, 
-  Radar, 
-  Video, 
-  Activity, 
-  ChevronLeft, 
-  ChevronRight,
-  User
-} from 'lucide-react';
+import GroundStrikeScreen from './GroundStrikeScreen';
 import OverviewScreen from './OverviewScreen';
 import StrikePortalAir from './StrikePortalAir';
 
-const COLORS = {
-  background: '#0A0C0F',
-  surface: '#111318',
-  accentGreen: '#00FF88',
-  accentAmber: '#FFB300',
-  dangerRed: '#FF2D2D',
-  border: '#1E2530',
-  textPrimary: '#E8EDF2',
-  textMuted: '#556070',
-  activeBg: '#1A2A1F',
-  hoverBg: '#161C24'
+const C = {
+  bg:        "#08090C",
+  surface:   "#0E1116",
+  surface2:  "#141820",
+  border:    "#1C2330",
+  borderHi:  "#243040",
+  green:     "#00FF88",
+  greenDim:  "#00CC66",
+  amber:     "#FFB300",
+  red:       "#FF2D2D",
+  redDim:    "#CC2020",
+  blue:      "#4A9EFF",
+  textPri:   "#D8E4F0",
+  textMuted: "#4A5A70",
+  textDim:   "#1C2836",
 };
 
+function TopBar({ screen, setScreen, utcTime }) {
+  return (
+    <div style={{ height:34, background:C.surface, borderBottom:`1px solid ${C.border}`,
+      display:"flex", alignItems:"center", padding:"0 10px", flexShrink:0, gap:16, WebkitAppRegion: 'drag' }}>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke={C.textPri} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round">
+          <path d="M4 8h8l-4 14m4 -14h6a4 4 0 0 1 0 8h-4l3 7m-3 -7h-2" />
+          <polygon points="1,14 16,30 31,14 26,4 6,4" strokeWidth="1.5" strokeOpacity="0.4" />
+        </svg>
+        <div style={{ fontFamily:"'Inter', sans-serif", fontSize:15, fontWeight:800, color:C.textPri, letterSpacing:1.5 }}>
+          SEVEN ROUNDS DEFENDER
+        </div>
+      </div>
+
+      <div style={{ width:1, height:16, background:C.border }} />
+
+      {[
+        ["SYSTEM STATUS","SECURE (JACOB-IX)", C.green],
+        ["GPS","LOCK (WGS-84)", C.green],
+        ["COMMS","ENCRYPTED", C.amber],
+      ].map(([k,v,col]) => (
+        <div key={k} style={{ fontSize:8, fontFamily:"monospace", color:C.textMuted, letterSpacing:.3 }}>
+          {k}: <span style={{color:col, fontWeight:700}}>{v}</span>
+        </div>
+      ))}
+
+      <div style={{ flex:1 }} />
+
+      <div style={{ fontFamily:"monospace", fontSize:9, color:C.green, letterSpacing:1.5 }}>
+        UTC: <span style={{fontWeight:900}}>{utcTime}</span>
+      </div>
+
+      <div style={{ width:1, height:16, background:C.border }} />
+
+      <div style={{ display: 'flex', gap: 4, WebkitAppRegion: 'no-drag' }}>
+        {[["OVERVIEW","overview"],["STRIKE — GROUND","ground"],["AIR INTERCEPT","air"]].map(([l,k]) => (
+          <button key={k} onClick={() => setScreen(k)} style={{
+            padding:"3px 9px",
+            background: screen===k ? `${C.green}1A` : "transparent",
+            border: screen===k ? `1px solid ${C.green}55` : `1px solid ${C.border}`,
+            color: screen===k ? C.green : C.textMuted,
+            fontFamily:"monospace", fontSize:8, letterSpacing:1, cursor:"pointer", borderRadius:1,
+          }}>{l}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ThreatBar() {
+  const col = C.amber;
+  return (
+    <div style={{ height:22, background:`${col}0D`, borderBottom:`1px solid ${col}33`,
+      display:"flex", alignItems:"center", padding:"0 10px", flexShrink:0, gap:20 }}>
+      {[
+        ["THREAT LEVEL", "MODERATE", C.amber],
+        ["MISSION", "COUNTER-INSURGENCY OPS", C.amber],
+        ["OPERATIONAL AREA", "LIKHAPANI SECTOR — INDIA/MYANMAR BORDER", C.textPri],
+        ["GRID", "42R VK 1234 5678", C.green],
+      ].map(([k,v,vc]) => (
+        <div key={k} style={{ fontSize:7.5, fontFamily:"monospace", color:C.textMuted, letterSpacing:.3 }}>
+          {k}: <span style={{color:vc, fontWeight:700}}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AppShell() {
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
-  const [timeUTC, setTimeUTC] = useState('');
-  const [activeItem, setActiveItem] = useState('Overview');
+  const [screen, setScreen] = useState("ground");
+  const [utcTime, setUtcTime] = useState("");
 
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTimeUTC(now.toISOString().substring(11, 19) + ' UTC');
+    const tick = () => {
+      const d = new Date();
+      const hms = d.toUTCString().split(" ")[4];
+      const date = `${String(d.getUTCDate()).padStart(2,"0")} ${d.toLocaleString("en",{month:"short",timeZone:"UTC"}).toUpperCase()} ${d.getUTCFullYear()}`;
+      setUtcTime(`${hms} Z (${date})`);
     };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
   }, []);
 
-  const menuItems = [
-    { id: 'Overview', label: 'Overview', icon: Grid },
-    { id: 'Strike Portal - Ground', label: 'Strike Portal — Ground', icon: Crosshair },
-    { id: 'Strike Portal - Air', label: 'Strike Portal — Air Intercept', icon: Radar },
-    { divider: true },
-    { id: 'Video Feed', label: 'Video Feed', icon: Video },
-    { id: 'System Status', label: 'System Status', icon: Activity },
-  ];
-
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      height: '100vh', 
-      width: '100vw', 
-      backgroundColor: COLORS.background, 
-      color: COLORS.textPrimary,
-      fontFamily: '"Inter", "Barlow Condensed", sans-serif',
-      overflow: 'hidden'
-    }}>
-      {/* TOP BAR */}
-      <div style={{
-        height: '48px',
-        backgroundColor: COLORS.surface,
-        borderBottom: `1px solid ${COLORS.border}`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 16px',
-        WebkitAppRegion: 'drag', // For Electron frameless window
-        userSelect: 'none'
-      }}>
-        {/* Left: App Name */}
-        <div style={{
-          fontFamily: '"JetBrains Mono", "IBM Plex Mono", monospace',
-          fontWeight: 'bold',
-          letterSpacing: '2px',
-          fontSize: '14px',
-          color: COLORS.textPrimary
-        }}>
-          BRAHMA C2
-        </div>
-
-        {/* Center: Clock */}
-        <div style={{
-          fontFamily: '"JetBrains Mono", "IBM Plex Mono", monospace',
-          fontSize: '14px',
-          color: COLORS.accentGreen,
-          letterSpacing: '1px'
-        }}>
-          {timeUTC}
-        </div>
-
-        {/* Right: Operator ID & Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '6px',
-            fontFamily: '"JetBrains Mono", "IBM Plex Mono", monospace',
-            fontSize: '12px',
-            color: COLORS.textMuted
-          }}>
-            <User size={14} />
-            OPR-7742
-          </div>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            backgroundColor: '#1A2A1F',
-            padding: '4px 10px',
-            borderRadius: '2px',
-            border: `1px solid ${COLORS.accentGreen}40`
-          }}>
-            <div style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              backgroundColor: COLORS.accentGreen,
-              boxShadow: `0 0 8px ${COLORS.accentGreen}`
-            }} />
-            <span style={{
-              fontFamily: '"JetBrains Mono", "IBM Plex Mono", monospace',
-              fontSize: '11px',
-              color: COLORS.accentGreen,
-              fontWeight: 'bold'
-            }}>ONLINE</span>
-          </div>
-        </div>
-      </div>
-
-      {/* MAIN LAYOUT */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        
-        {/* SIDEBAR */}
-        <div style={{
-          width: isSidebarExpanded ? '220px' : '56px',
-          backgroundColor: COLORS.surface,
-          borderRight: `1px solid ${COLORS.border}`,
-          display: 'flex',
-          flexDirection: 'column',
-          transition: 'width 0.2s ease',
-          position: 'relative',
-          zIndex: 10
-        }}>
-          {/* Mission Status Badge */}
-          <div style={{
-            height: '48px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: isSidebarExpanded ? 'flex-start' : 'center',
-            padding: isSidebarExpanded ? '0 16px' : '0',
-            borderBottom: `1px solid ${COLORS.border}`,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap'
-          }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: COLORS.accentAmber,
-              boxShadow: `0 0 8px ${COLORS.accentAmber}`,
-              animation: 'pulse 2s infinite',
-              flexShrink: 0,
-              marginRight: isSidebarExpanded ? '12px' : '0'
-            }} />
-            {isSidebarExpanded && (
-              <span style={{
-                fontFamily: '"JetBrains Mono", "IBM Plex Mono", monospace',
-                fontSize: '11px',
-                color: COLORS.accentAmber,
-                fontWeight: 'bold',
-                letterSpacing: '1px'
-              }}>MISSION: ACTIVE</span>
-            )}
-          </div>
-
-          {/* Navigation Items */}
-          <div style={{ flex: 1, padding: '12px 0', overflowY: 'auto' }}>
-            {menuItems.map((item, idx) => {
-              if (item.divider) {
-                return <div key={`div-${idx}`} style={{ 
-                  height: '1px', 
-                  backgroundColor: COLORS.border, 
-                  margin: '12px 16px' 
-                }} />;
-              }
-
-              const isActive = activeItem === item.id;
-              const Icon = item.icon;
-              return (
-                <div 
-                  key={item.id}
-                  onClick={() => setActiveItem(item.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    height: '40px',
-                    padding: '0 16px',
-                    cursor: 'pointer',
-                    backgroundColor: isActive ? COLORS.activeBg : 'transparent',
-                    borderLeft: `3px solid ${isActive ? COLORS.accentGreen : 'transparent'}`,
-                    transition: 'all 0.15s ease',
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.backgroundColor = COLORS.hoverBg;
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <div style={{ flexShrink: 0, color: isActive ? COLORS.accentGreen : COLORS.textMuted }}>
-                    <Icon size={18} />
-                  </div>
-                  {isSidebarExpanded && (
-                    <span style={{
-                      marginLeft: '14px',
-                      fontSize: '13px',
-                      color: isActive ? COLORS.textPrimary : COLORS.textMuted,
-                      fontWeight: isActive ? 600 : 400
-                    }}>
-                      {item.label}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Collapse Toggle */}
-          <div 
-            onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-            style={{
-              height: '48px',
-              borderTop: `1px solid ${COLORS.border}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: COLORS.textMuted
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = COLORS.textPrimary;
-              e.currentTarget.style.backgroundColor = COLORS.hoverBg;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = COLORS.textMuted;
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            {isSidebarExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-          </div>
-        </div>
-
-        {/* MAIN CONTENT AREA */}
-        <div style={{
-          flex: 1,
-          backgroundColor: COLORS.background,
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }}>
-          {activeItem === 'Overview' ? <OverviewScreen /> : 
-           activeItem === 'Strike Portal - Air' ? <StrikePortalAir /> : 
-           (
-            <div style={{
-              fontFamily: '"JetBrains Mono", "IBM Plex Mono", monospace',
-              fontSize: '24px',
-              color: COLORS.textMuted,
-              letterSpacing: '2px',
-              opacity: 0.5,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '24px',
-              flex: 1
-            }}>
-              <div>// {activeItem.toUpperCase()} [MODULE OFFLINE]</div>
-              <div style={{ display: 'flex', gap: '24px', flex: 1 }}>
-                <div style={{ flex: 2, border: `1px dashed ${COLORS.border}`, borderRadius: '4px', backgroundColor: COLORS.surface }} />
-                <div style={{ flex: 1, border: `1px dashed ${COLORS.border}`, borderRadius: '4px', backgroundColor: COLORS.surface }} />
-              </div>
-              <div style={{ height: '30%', border: `1px dashed ${COLORS.border}`, borderRadius: '4px', backgroundColor: COLORS.surface }} />
-            </div>
-           )}
-        </div>
-      </div>
+    <div style={{ width:"100vw", height:"100vh", background:C.bg,
+      display:"flex", flexDirection:"column", overflow:"hidden", color:C.textPri }}>
       
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 ${COLORS.accentAmber}80; }
-          70% { box-shadow: 0 0 0 6px ${COLORS.accentAmber}00; }
-          100% { box-shadow: 0 0 0 0 ${COLORS.accentAmber}00; }
-        }
-      `}} />
+      {/* Top Bar Navigation */}
+      <TopBar screen={screen} setScreen={setScreen} utcTime={utcTime} />
+      <ThreatBar />
+
+      {/* Main Content */}
+      <div style={{ flex:1, display:"flex", overflow:"hidden", minHeight:0 }}>
+        {screen==="overview" && <OverviewScreen />}
+        {screen==="air"      && <StrikePortalAir />}
+        {screen==="ground"   && <GroundStrikeScreen />}
+      </div>
     </div>
   );
 }
