@@ -514,6 +514,8 @@ function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
   const [authExpired, setAuthExpired] = useState(false);
   const sliderRef = useRef(null);
   const swipeTimeout = useRef(null);
+  const isDraggingRef = useRef(false);
+  const sliderWidthRef = useRef(0);
   
   const etaSecs = useRef(154);
   const [eta, setEta] = useState("00:02:34");
@@ -527,54 +529,47 @@ function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
   }, []);
 
   const handleStart = (e) => {
-    e.preventDefault();
     if (lockPhase === "authorized") return;
-    setDragging(true);
+    isDraggingRef.current = true;
+    if (sliderRef.current) sliderWidthRef.current = sliderRef.current.getBoundingClientRect().width;
     if (swipeTimeout.current) clearTimeout(swipeTimeout.current);
     swipeTimeout.current = setTimeout(resetSwipe, 5000);
   };
 
-  const handleMove = useCallback((clientX) => {
-    if (!dragging || !sliderRef.current) return;
-    const rect = sliderRef.current.getBoundingClientRect();
-    const x = Math.min(Math.max(clientX - rect.left - 14, 0), rect.width - 30);
-    setSwipeX(x);
-    if (x >= rect.width - 34) {
-      if (swipeTimeout.current) clearTimeout(swipeTimeout.current);
-      setLockPhase("authorized");
-      setDragging(false);
-      setSwipeX(0);
-    }
-  }, [dragging, setLockPhase]);
-
-  const handleEnd = () => {
-    if (!dragging) return;
-    setDragging(false);
-    if (lockPhase !== "authorized") {
-      setSwipeX(0);
-      if (swipeTimeout.current) clearTimeout(swipeTimeout.current);
-    }
-  };
-
-  // Bind Mouse & Touch events globally when dragging (BUG 4 Fix)
   useEffect(() => {
-    if (!dragging) return;
-    const onMove = (e) => {
+    const handleMove = (e) => {
+      if (!isDraggingRef.current) return;
+      if (e.cancelable) e.preventDefault();
       const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-      handleMove(clientX);
+      if (!sliderRef.current) return;
+      const rect = sliderRef.current.getBoundingClientRect();
+      const maxX = rect.width - 30;
+      const newX = Math.min(Math.max(clientX - rect.left - 14, 0), maxX);
+      setSwipeX(newX);
+      if (newX >= maxX - 4) {
+        isDraggingRef.current = false;
+        if (swipeTimeout.current) clearTimeout(swipeTimeout.current);
+        setLockPhase("authorized");
+        setSwipeX(0);
+      }
     };
-    const onUp = () => handleEnd();
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    window.addEventListener('touchmove', onMove, { passive: false });
-    window.addEventListener('touchend', onUp);
+    const handleUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        if (lockPhase !== "authorized") setSwipeX(0);
+      }
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleUp);
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      window.removeEventListener('touchmove', onMove);
-      window.removeEventListener('touchend', onUp);
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleUp);
     };
-  }, [dragging, handleMove]);
+  }, [lockPhase, setLockPhase]);
 
   useEffect(() => {
     if (lockPhase !== "authorized") return;
