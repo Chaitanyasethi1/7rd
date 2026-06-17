@@ -81,11 +81,14 @@ export default function LiveVideoPanel() {
     };
   }, []);
 
-  // Mock drones for telemetry (BUG 4 Fix)
-  const FRIENDLY_DRONES = {
+  // Mock drones for telemetry (BUG 3 Fix)
+  const FEED_DATA = {
     0: { id: 'DELTA-7', lat: '28.4595', lng: '77.0266', alt: '340', spd: '48', hdg: '042' },
+    1: { id: 'DELTA-4', lat: '28.5210', lng: '77.1340', alt: '280', spd: '52', hdg: '118' },
+    2: { id: 'DELTA-9', lat: '28.4880', lng: '77.0890', alt: '410', spd: '44', hdg: '235' },
+    3: { id: 'SAR-1',   lat: '28.5000', lng: '77.0500', alt: '500', spd: '30', hdg: '000' },
   };
-  const activeDrone = FRIENDLY_DRONES[activeTab];
+  const activeDrone = FEED_DATA[activeTab];
 
   return (
     <div id="video-panel" className="video-panel" style={{
@@ -107,8 +110,8 @@ export default function LiveVideoPanel() {
         </div>
       </div>
 
-      {/* Primary Video Display Area (~65%) */}
-      <div style={{ flex: '0 0 55%', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Primary Video Display Area (BUG 1 Fix: Overflow logic) */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ flex: 1, background: '#000', position: 'relative', overflow: 'hidden' }}>
           
           <video 
