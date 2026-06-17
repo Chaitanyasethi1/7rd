@@ -199,7 +199,8 @@ function MapPanel({ targets, setTargets, selectedTarget, setSelectedTarget, lock
 
     currentTileLayer.current = L.tileLayer(url, opts).addTo(lMap.current);
     
-    // Bring markers to front
+    // Bring tile layer to back so all markers (including drone/custom) stay on top (BUG 1 Fix)
+    currentTileLayer.current.bringToBack();
     targetMarkers.current.forEach(m => m.setZIndexOffset(1000));
   }, [mapLayer]);
 
@@ -301,11 +302,12 @@ function MapPanel({ targets, setTargets, selectedTarget, setSelectedTarget, lock
       marker.on('popupopen', () => {
         const btn = document.getElementById(`btn-sel-${t.id}`);
         if(btn) {
-          btn.onclick = () => {
+          // BUG 2 Fix: Event delegation
+          btn.addEventListener('click', () => {
             setSelectedTarget(t);
             if(lockPhase==="idle") setLockPhase("select");
             lMap.current.closePopup();
-          };
+          });
         }
       });
 
@@ -336,10 +338,20 @@ function MapPanel({ targets, setTargets, selectedTarget, setSelectedTarget, lock
       { color:col, weight:2, className: 'animated-strike-line', opacity:.9 }
     ).addTo(lMap.current);
 
+    // BUG 3 Fix: Force CSS animation onto the SVG path element
+    setTimeout(() => {
+      const el = lineRef.current?.getElement();
+      if (el) {
+        el.style.strokeDasharray = '12 8';
+        el.style.animation = 'strike-flow 0.5s linear infinite';
+      }
+    }, 100);
+
     // Enh 6: Target Lock Cinematic Feedback
     if (lockPhase === "locked" || lockPhase === "authorized") {
       if (lockPhase === "locked") {
-        lMap.current.flyTo([selectedTarget.lat, selectedTarget.lng], 16, { duration: 1.5 });
+        // BUG 5 Fix: Safety null check for flyTo
+        lMap.current?.flyTo([selectedTarget.lat, selectedTarget.lng], 16, { duration: 1.5 });
       }
 
       lockRingRef.current = L.circle([selectedTarget.lat, selectedTarget.lng], {
@@ -533,13 +545,25 @@ function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
     }
   };
 
-  // Bind Mouse & Touch events (Enh 7a)
-  const onMD = (e) => handleStart(e);
-  const onMM = (e) => handleMove(e.clientX);
-  const onMU = () => handleEnd();
-  const onTS = (e) => handleStart(e);
-  const onTM = (e) => handleMove(e.touches[0].clientX);
-  const onTE = () => handleEnd();
+  // Bind Mouse & Touch events globally when dragging (BUG 4 Fix)
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e) => {
+      const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+      handleMove(clientX);
+    };
+    const onUp = () => handleEnd();
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [dragging, handleMove]);
 
   useEffect(() => {
     if (lockPhase !== "authorized") return;
@@ -561,8 +585,7 @@ function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
   }, []);
 
   return (
-    <div onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU} onTouchMove={onTM} onTouchEnd={onTE}
-      style={{ width:280, background:C.surface, borderLeft:`1px solid ${C.border}`,
+    <div style={{ width:280, background:C.surface, borderLeft:`1px solid ${C.border}`,
         display:"flex", flexDirection:"column", flexShrink:0, overflow:"hidden" }}>
 
       <SH title="EO/IR CAM — IA-R902" right={<Pill label="LIVE" color={C.red} pulse small />} />
@@ -653,7 +676,7 @@ function RightPanel({ selectedTarget, lockPhase, setLockPhase, missionLog }) {
             <div style={{ fontFamily:"monospace", fontSize:7, color:C.textMuted, textAlign:"center", letterSpacing:.5 }}>DRAG SLIDER TO AUTHORIZE STRIKE</div>
             <div ref={sliderRef} style={{ height:34, background:`${C.red}12`, border:`1px solid ${C.red}66`, position:"relative", cursor:"ew-resize", overflow:"hidden" }}>
               <div style={{ position:"absolute", top:0, left:0, height:"100%", width:swipeX+30, background:`${C.red}20`, pointerEvents:"none" }} />
-              <div onMouseDown={onMD} onTouchStart={onTS} style={{
+              <div onMouseDown={handleStart} onTouchStart={handleStart} style={{
                 position:"absolute", top:3, left:swipeX+3, width:28, height:28,
                 background:C.red, display:"flex", alignItems:"center", justifyContent:"center",
                 cursor:"grab", userSelect:"none", fontSize:13, touchAction: 'none'

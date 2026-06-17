@@ -30,6 +30,7 @@ function formatTime(seconds) {
 export default function Sidebar({ screen, setScreen }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [missionTime, setMissionTime] = useState(32 * 60 + 14); // 00:32:14
+  const [activeTooltip, setActiveTooltip] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -39,7 +40,7 @@ export default function Sidebar({ screen, setScreen }) {
   }, []);
 
   return (
-    <div style={{
+    <div id="sidebar" className={isCollapsed ? 'collapsed' : ''} style={{
       width: isCollapsed ? 58 : 220,
       minWidth: isCollapsed ? 58 : 220,
       height: '100%',
@@ -47,7 +48,7 @@ export default function Sidebar({ screen, setScreen }) {
       borderRight: `1px solid ${C.border}`,
       display: 'flex',
       flexDirection: 'column',
-      transition: 'width 0.2s ease',
+      transition: 'width 0.22s 0.05s cubic-bezier(0.4,0,0.2,1)', // BUG 1 Fix
       position: 'relative',
       zIndex: 50
     }}>
@@ -58,18 +59,18 @@ export default function Sidebar({ screen, setScreen }) {
           <div style={{ width: 8, height: 8, background: C.green, borderRadius: '50%', flexShrink: 0 }} />
           <div className="nav-label" style={{ 
             fontSize: 10, color: C.green, fontWeight: 700, fontFamily: 'monospace',
-            opacity: isCollapsed ? 0 : 1, transition: 'opacity 0.15s ease', overflow: 'hidden'
+            opacity: isCollapsed ? 0 : 1, transition: 'opacity 0.12s ease', overflow: 'hidden'
           }}>
             MISSION: KARGIL-WATCH ACTIVE
           </div>
         </div>
         
-        <div style={{ 
+        <div className="sidebar-timer" style={{ 
           fontSize: 10, color: C.textMuted, fontFamily: 'monospace', paddingLeft: 16,
-          opacity: isCollapsed ? 0 : 1, transition: 'opacity 0.15s ease',
+          opacity: isCollapsed ? 0 : 1, transition: 'opacity 0.12s ease',
           height: isCollapsed ? 0 : 'auto', overflow: 'hidden', whiteSpace: 'nowrap'
         }}>
-          <span style={{ color: C.textPri, fontWeight: 700 }}>{formatTime(missionTime)}</span> ELAPSED
+          <span id="mission-timer" style={{ color: C.textPri, fontWeight: 700 }}>{formatTime(missionTime)}</span> ELAPSED
         </div>
       </div>
 
@@ -83,6 +84,8 @@ export default function Sidebar({ screen, setScreen }) {
               className={`nav-item ${isCollapsed ? 'collapsed' : ''}`}
               data-tooltip={item.label}
               onClick={() => setScreen(item.id)}
+              onMouseEnter={(e) => isCollapsed && setActiveTooltip({ label: item.label, top: e.currentTarget.getBoundingClientRect().top + 10 })}
+              onMouseLeave={() => setActiveTooltip(null)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px',
                 background: active ? `${C.green}1A` : 'transparent',
@@ -95,7 +98,7 @@ export default function Sidebar({ screen, setScreen }) {
               <div style={{ position: 'relative' }}>
                 <item.icon size={18} strokeWidth={2} />
                 {item.badge > 0 && (
-                  <div className="nav-badge" style={{
+                  <div id={item.id === 'air' ? 'threat-badge' : undefined} className="nav-badge" style={{
                     position: 'absolute', top: -6, right: -6, background: C.red, color: '#FFF',
                     fontSize: 8, fontWeight: 900, borderRadius: '50%', width: 14, height: 14,
                     display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -106,7 +109,7 @@ export default function Sidebar({ screen, setScreen }) {
               </div>
               <span className="nav-label" style={{
                 fontFamily: 'monospace', fontSize: 11, fontWeight: 600, letterSpacing: 0.5,
-                opacity: isCollapsed ? 0 : 1, transition: 'opacity 0.15s ease'
+                opacity: isCollapsed ? 0 : 1, transition: 'opacity 0.12s ease'
               }}>
                 {item.label}
               </span>
@@ -124,9 +127,9 @@ export default function Sidebar({ screen, setScreen }) {
         ].map(sys => (
           <div key={sys.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: sys.status }} />
-            <div className="nav-label" style={{ 
+            <div className="nav-section-label" style={{ 
               fontSize: 8, color: C.textMuted, fontFamily: 'monospace',
-              opacity: isCollapsed ? 0 : 1, transition: 'opacity 0.15s ease',
+              opacity: isCollapsed ? 0 : 1, transition: 'opacity 0.12s ease',
               width: isCollapsed ? 0 : 'auto', overflow: 'hidden'
             }}>
               {sys.label}
@@ -146,6 +149,19 @@ export default function Sidebar({ screen, setScreen }) {
       >
         {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
+
+      {/* Tooltip Portal */}
+      {activeTooltip && (
+        <div id="sidebar-tooltip" style={{
+          position: 'fixed', left: 66, top: activeTooltip.top,
+          background: '#121820', border: '1px solid #243048',
+          color: '#E2EAF4', fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 10, padding: '4px 10px', whiteSpace: 'nowrap',
+          zIndex: 9999, pointerEvents: 'none', letterSpacing: '.05em'
+        }}>
+          {activeTooltip.label}
+        </div>
+      )}
 
     </div>
   );

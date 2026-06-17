@@ -35,6 +35,25 @@ function TopBar({ screen, utcTime }) {
     <div style={{ height:34, background:C.surface, borderBottom:`1px solid ${C.border}`,
       display:"flex", alignItems:"center", padding:"0 10px", flexShrink:0, gap:16, WebkitAppRegion: 'drag' }}>
 
+      {/* BUG 3 Fix: WS Demo Button */}
+      <button onClick={() => {
+        const types = [
+          { type:'log', text:'Simulated WS event — target coordinates updated', severity:'warning' },
+          { type:'stat', key:'detected', value: Math.floor(Math.random()*10) + 5 },
+          { type:'log', text:'AI engine processed frame batch — 3 objects classified', severity:'info' },
+        ];
+        const d = new Date();
+        const ts = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+        const msg = types[Math.floor(Math.random()*types.length)];
+        if(msg.type === 'log') msg.ts = ts;
+        window.dispatchEvent(new CustomEvent('ws-message', { detail: msg }));
+      }} style={{
+        fontFamily:"monospace", fontSize:9, color:"#FFB300", border:"1px solid #FFB30044", 
+        background:"none", padding:"2px 8px", cursor:"pointer"
+      }}>
+        WS DEMO
+      </button>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
         <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke={C.textPri} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round">
           <path d="M4 8h8l-4 14m4 -14h6a4 4 0 0 1 0 8h-4l3 7m-3 -7h-2" />
@@ -121,7 +140,7 @@ export default function AppShell() {
       <div style={{ flex:1, display:"flex", overflow:"hidden", minHeight:0 }}>
         <Sidebar screen={screen} setScreen={setScreen} />
         
-        <div style={{ flex:1, display:"flex", overflow:"hidden", position:"relative" }}>
+        <div style={{ flex:1, display:"flex", overflow:"hidden", position:"relative", minWidth: 0 }}>
           {screen==="overview" && <OverviewScreen setScreen={setScreen} />}
           {screen==="air"      && <StrikePortalAir />}
           {screen==="ground"   && <GroundStrikeScreen />}

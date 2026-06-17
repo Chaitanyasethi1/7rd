@@ -63,3 +63,10 @@ button:active { transform: scale(0.97); }
 @keyframes strike-flow { to { stroke-dashoffset: -20; } }
 .lock-tooltip { background: #121820; border: 1px solid #FF3344; color: #FF3344; font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 2px 6px; border-radius: 0; }
 
+
+@media (max-width: 1100px) { .video-panel { display: none !important; } }
+
+.nav-badge { animation: badge-pulse 2s ease-in-out infinite; transform-origin: center; }
+@keyframes badge-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.92); } }
+
+@keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }

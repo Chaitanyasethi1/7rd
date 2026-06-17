@@ -139,14 +139,11 @@ export default function OverviewScreen({ setScreen }) {
             });
           }, 600);
 
-          // Add matching log event
-          const textMap = [
-            'Targets identified updated: <strong>' + oldVal + ' → ' + newVal + '</strong>',
-            'Strikes executed updated: <strong>' + oldVal + ' → ' + newVal + '</strong>',
-            'Enemy drones detected updated: <strong>' + oldVal + ' → ' + newVal + '</strong>',
-            'Drones neutralised updated: <strong>' + oldVal + ' → ' + newVal + '</strong>'
-          ];
-          addLogEvent(textMap[rIdx]);
+          // Add matching log event (BUG 1 Fix: Null checks & exact text output)
+          const labels = ['Targets identified', 'Strikes executed', 'Enemy drones detected', 'Drones neutralised'];
+          const d = new Date();
+          const utcNow = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+          addLogEvent(utcNow, labels[rIdx] + ': ' + oldVal + ' → ' + newVal, diff > 0 ? 'warning' : 'info');
 
           return next;
         });
@@ -163,35 +160,69 @@ export default function OverviewScreen({ setScreen }) {
     // Implementation ready when backend is wired
   };
 
-  const addLogEvent = (text) => {
+  const addLogEvent = (ts, text, sev) => {
+    if (!text) { text = ts; ts = null; }
     const d = new Date();
-    const time = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
-    setLogEvents(prev => [{ id: Date.now(), time, text }, ...prev]);
+    const time = ts || `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+    setLogEvents(prev => {
+      // BUG 1 Fix: Limit to 200 events
+      const next = [{ id: Date.now() + Math.random(), time, text, sev: sev || 'info', receivedAt: Date.now() }, ...prev];
+      if (next.length > 200) next.pop();
+      return next;
+    });
     // Auto-scroll (Addition 2a)
     if (logListRef.current) {
       logListRef.current.scrollTop = 0;
     }
   };
 
-  // Addition 2b: Filter logic
+  // Addition 2b: Filter logic (BUG 4 Fix)
   const filteredLogs = logEvents.filter(ev => {
-    const t = ev.text.toLowerCase();
+    const t = ev.text.toLowerCase() + ' ' + (ev.time||'').toLowerCase();
     if (logFilter === 'ALL') return true;
-    if (logFilter === 'STRIKE') return t.includes('strike') || t.includes('authorized') || t.includes('tgt') || t.includes('target');
-    if (logFilter === 'THREAT') return t.includes('bandit') || t.includes('uav') || t.includes('detected') || t.includes('hostile');
-    if (logFilter === 'SYSTEM') return t.includes('gps') || t.includes('link') || t.includes('operator') || t.includes('battery') || t.includes('system');
+    if (logFilter === 'STRIKE') return ['strike','authorized','tgt','executed'].some(k => t.includes(k));
+    if (logFilter === 'THREAT') return ['bandit','uav','detected','intercept','enemy'].some(k => t.includes(k));
+    if (logFilter === 'SYSTEM') return ['gps','link','operator','battery','connected','comms','system'].some(k => t.includes(k));
     return true;
   });
 
-  // Addition 5: Generate Report
+  // BUG 4 Fix: exportMissionLog / generateMissionReport cross-browser fix
   const generateMissionReport = () => {
-    const report = `BRAHMA C2 MISSION REPORT\nGenerated: ${new Date().toUTCString()}\n\nSTATS:\n${stats.map(s => `${s.title}: ${s.value}`).join('\n')}\n\nMISSION LOG:\n${logEvents.map(e => `[${e.time}] ${e.text}`).join('\n')}`;
-    const blob = new Blob([report], {type:'text/plain'});
-    const a = document.createElement('a'); 
-    a.href = URL.createObjectURL(blob);
-    a.download = 'BRAHMA-MISSION-REPORT-' + Date.now() + '.txt'; 
+    const header = [
+      'BRAHMA C2 — MISSION LOG EXPORT',
+      'Mission: KARGIL-WATCH',
+      'Exported: ' + new Date().toUTCString(),
+      '─'.repeat(60), ''
+    ].join('\n');
+    const lines = (logEvents || []).map(e => {
+      const clean = (e.text||'').replace(/<[^>]+>/g,'');
+      return `[${e.time}] [${(e.sev||'INFO').toUpperCase().padEnd(7)}] ${clean}`;
+    }).join('\n');
+
+    const blob = new Blob([header + lines], { type: 'text/plain;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.style.display = 'none';
+    a.href          = url;
+    a.download      = 'BRAHMA-LOG-' + Date.now() + '.txt';
+    document.body.appendChild(a); // ← REQUIRED in Firefox
     a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    addLogEvent(null, 'Mission log exported — ' + logEvents.length + ' entries', 'info');
   };
+
+  // Listen for WS Simulator events (BUG 3 Fix)
+  useEffect(() => {
+    const onWs = (e) => {
+      const msg = e.detail;
+      if (msg.type === 'log') addLogEvent(msg.ts, msg.text, msg.severity);
+      if (msg.type === 'stat') {
+        setStats(prev => prev.map(s => s.id === `sc-${msg.key}` ? { ...s, value: msg.value, flash: true } : s));
+      }
+    };
+    window.addEventListener('ws-message', onWs);
+    return () => window.removeEventListener('ws-message', onWs);
+  }, []);
 
   return (
     <div style={{ 
@@ -205,20 +236,21 @@ export default function OverviewScreen({ setScreen }) {
       overflow: 'hidden'
     }}>
       
-      {/* Addition 4: Active Threats Ticker */}
+      {/* Addition 4: Active Threats Ticker (BUG 2 Fix) */}
       <div style={{
         height: '32px', flexShrink: 0,
         background: `${COLORS.dangerRed}22`,
         border: `1px solid ${COLORS.dangerRed}44`,
-        display: 'flex', alignItems: 'center', overflow: 'hidden'
+        display: 'flex', alignItems: 'center', overflow: 'hidden', whiteSpace: 'nowrap', position: 'relative'
       }}>
-        <div style={{ padding: '0 12px', color: COLORS.dangerRed, fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap', zIndex: 2, background: `${COLORS.dangerRed}22` }}>
+        <div style={{ padding: '0 12px', color: COLORS.dangerRed, fontSize: '10px', fontWeight: 'bold', zIndex: 2, background: `${COLORS.surface}` }}>
           ⚠ ACTIVE THREATS:
         </div>
-        <div style={{ flex: 1, overflow: 'hidden', position: 'relative', height: '100%' }}>
+        <div style={{ flex: 1, overflow: 'hidden', position: 'relative', height: '100%', whiteSpace: 'nowrap' }}>
           <div style={{
-            position: 'absolute', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', height: '100%',
-            animation: 'ticker 20s linear infinite', color: COLORS.dangerRed, fontFamily: FONT_MONO, fontSize: '10px'
+            position: 'absolute', whiteSpace: 'nowrap', display: 'inline-block', alignItems: 'center', height: '100%',
+            animation: 'ticker-scroll 18s linear infinite', color: COLORS.dangerRed, fontFamily: FONT_MONO, fontSize: '10px',
+            paddingLeft: '100%', paddingTop: '10px'
           }}>
             BANDIT-01 BRG:042° ALT:180m &nbsp;&nbsp;|&nbsp;&nbsp; BANDIT-02 BRG:228° ALT:240m &nbsp;&nbsp;|&nbsp;&nbsp; TGT-03 UNENGAGED
           </div>
@@ -244,10 +276,11 @@ export default function OverviewScreen({ setScreen }) {
             AREA OF OPERATIONS — OVERVIEW
           </div>
           <MapContainer 
+            whenReady={(map) => { setTimeout(() => { map.target.invalidateSize(); }, 150); }}
             center={[28.4650, 77.0300]} 
             zoom={12} 
             zoomControl={false} scrollWheelZoom={false} dragging={false} doubleClickZoom={false}
-            style={{ width: '100%', height: '100%', backgroundColor: '#000' }}
+            style={{ width: '100%', height: '100%', minHeight: '220px', backgroundColor: '#000' }}
           >
             <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
             {/* Mock ground target */}
@@ -309,12 +342,23 @@ export default function OverviewScreen({ setScreen }) {
           <div ref={logListRef} style={{
             flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', scrollBehavior: 'smooth'
           }}>
-            {filteredLogs.map(event => (
-              <div key={event.id} style={{ display: 'flex', gap: '12px', fontFamily: FONT_MONO, fontSize: '11px', lineHeight: 1.4 }}>
-                <div style={{ color: COLORS.accentGreen, opacity: 0.7 }}>[{event.time}]</div>
-                <div style={{ color: COLORS.textPrimary }} dangerouslySetInnerHTML={{ __html: event.text }} />
-              </div>
-            ))}
+            {filteredLogs.map(event => {
+              // BUG 2 Fix: Log layout
+              const dTime = event.receivedAt ? Math.floor((Date.now() - event.receivedAt) / 1000) : null;
+              const rel = dTime === null ? '' : dTime < 60 ? dTime+'s ago' : dTime < 3600 ? Math.floor(dTime/60)+'m ago' : Math.floor(dTime/3600)+'h ago';
+              const sevColor = { danger:'#FF3344', warning:'#FFB300', success:'#00FF88', info:'#8A9BB5' }[event.sev] || '#8A9BB5';
+              return (
+                <div key={event.id} className={`log-entry log-${event.sev||'info'}`} style={{
+                  padding: '6px 12px', borderBottom: '1px solid rgba(28,35,52,0.7)',
+                  borderLeft: `2px solid ${sevColor}33`,
+                  fontFamily: FONT_MONO, fontSize: '10px', lineHeight: 1.5
+                }}>
+                  <span style={{ color: sevColor, marginRight: '6px' }}>[{event.time}]</span>
+                  {rel && <span style={{ color: '#4A5A70', fontSize: '8px', marginRight: '6px' }}>({rel})</span>}
+                  <span style={{ color: '#C8D8E8' }} dangerouslySetInnerHTML={{ __html: event.text }} />
+                </div>
+              );
+            })}
             {filteredLogs.length === 0 && (
               <div style={{ color: COLORS.textMuted, fontSize: 11, fontFamily: FONT_MONO, textAlign: 'center', marginTop: 20 }}>NO EVENTS FOUND</div>
             )}

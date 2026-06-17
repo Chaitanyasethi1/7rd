@@ -49,10 +49,10 @@ export default function LiveVideoPanel() {
   const [hasSignal, setHasSignal] = useState(false);
   const primaryVideoRef = React.useRef(null);
   
-  // File size counter effect
+  // File size counter effect (BUG 3 Fix)
   useEffect(() => {
     const timer = setInterval(() => {
-      setRecSize(prev => prev + 0.001);
+      setRecSize(prev => parseFloat((prev + 0.001).toFixed(3)));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -64,6 +64,7 @@ export default function LiveVideoPanel() {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         if (primaryVideoRef.current) {
           primaryVideoRef.current.srcObject = stream;
+          primaryVideoRef.current.play().catch(e => console.warn('BRAHMA: autoplay blocked:', e)); // BUG 5 Fix
           setHasSignal(true);
         }
       } catch (err) {
@@ -80,19 +81,14 @@ export default function LiveVideoPanel() {
     };
   }, []);
 
-  // Hook functions required by spec
-  window.connectVideoStream = (deviceId, targetElementId) => {
-    console.log(`Connecting stream ${deviceId} to ${targetElementId}`);
+  // Mock drones for telemetry (BUG 4 Fix)
+  const FRIENDLY_DRONES = {
+    0: { id: 'DELTA-7', lat: '28.4595', lng: '77.0266', alt: '340', spd: '48', hdg: '042' },
   };
-  window.updateFeedTelemetry = (lat, lon, alt, spd, hdg) => {
-    console.log(`Telemetry Update: ${lat}, ${lon}, ${alt}, ${spd}, ${hdg}`);
-  };
-  window.switchActiveFeed = (tabIndex) => {
-    setActiveTab(tabIndex);
-  };
+  const activeDrone = FRIENDLY_DRONES[activeTab];
 
   return (
-    <div style={{
+    <div id="video-panel" className="video-panel" style={{
       width: 320, minWidth: 320, flexShrink: 0,
       background: C.surface,
       borderLeft: `1px solid ${C.border}`,
@@ -127,9 +123,9 @@ export default function LiveVideoPanel() {
           <HudCorners color={C.green} size={20} thick={2} />
           <Crosshair color={C.green} size={20} />
 
-          {/* Unit Label */}
-          <div style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, color: C.textMuted, zIndex: 10 }}>
-            {TABS[activeTab]} | EO/IR
+          {/* Unit Label (BUG 4 Fix) */}
+          <div id="feed-unit-label" style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, color: C.textMuted, zIndex: 10 }}>
+            {activeDrone ? `${activeDrone.id} | EO/IR` : 'NO SIGNAL'}
           </div>
 
           {/* LIVE Badge */}
@@ -145,22 +141,22 @@ export default function LiveVideoPanel() {
             </div>
           )}
 
-          {/* Telemetry Strip */}
+          {/* Telemetry Strip (BUG 4 Fix) */}
           <div style={{ 
             position: 'absolute', bottom: 0, left: 0, right: 0, 
             background: 'rgba(0,0,0,0.75)', borderTop: `1px solid rgba(0,255,136,0.15)`,
             display: 'flex', padding: '6px 8px', justifyContent: 'space-between', zIndex: 10
           }}>
             {[
-              {l:'LAT', v:'28.4595°N'},
-              {l:'LON', v:'77.0266°E'},
-              {l:'ALT', v:'340m'},
-              {l:'SPD', v:'48kts'},
-              {l:'HDG', v:'042°'}
+              {l:'LAT', v: activeDrone ? `${activeDrone.lat}°N` : '---'},
+              {l:'LON', v: activeDrone ? `${activeDrone.lng}°E` : '---'},
+              {l:'ALT', v: activeDrone ? `${activeDrone.alt}m` : '---'},
+              {l:'SPD', v: activeDrone ? `${activeDrone.spd}kts` : '---'},
+              {l:'HDG', v: activeDrone ? `${activeDrone.hdg}°` : '---'}
             ].map(item => (
               <div key={item.l} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                 <span style={{ fontSize: 8, color: C.textMuted }}>{item.l}</span>
-                <span style={{ fontSize: 11, color: C.green, fontWeight: 600 }}>{item.v}</span>
+                <span id={`feed-${item.l.toLowerCase()}`} style={{ fontSize: 11, color: C.green, fontWeight: 600 }}>{item.v}</span>
               </div>
             ))}
           </div>
@@ -174,7 +170,8 @@ export default function LiveVideoPanel() {
               <button
                 key={idx}
                 id={`feed-tab-${idx}`}
-                onClick={() => window.switchActiveFeed(idx)}
+                className={isActive ? 'active' : ''}
+                onClick={() => setActiveTab(idx)}
                 style={{
                   flex: 1, background: C.surface2, border: 'none',
                   borderBottom: `2px solid ${isActive ? C.green : 'transparent'}`,
