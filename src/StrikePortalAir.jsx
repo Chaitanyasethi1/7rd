@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Crosshair, ShieldAlert, Target, Rocket, CheckCircle2, Navigation, AlertTriangle } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Circle, Polyline } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const COLORS = {
   background: '#0A0C0F',
@@ -22,43 +25,63 @@ export default function StrikePortalAir() {
   const [distance, setDistance] = useState(4.2); // km
   const [eta, setEta] = useState(80); // seconds
   
-  // Drone Coordinates (Percentages for map overlay)
-  const [banditPos, setBanditPos] = useState({ x: 80, y: 15 });
-  const [friendlyPos, setFriendlyPos] = useState({ x: 20, y: 85 });
+  const BANDIT_START = { lat: 28.6500, lng: 77.2300 };
+  const DELTA7_START = { lat: 28.5800, lng: 77.1600 };
+  
+  const [banditPos, setBanditPos] = useState(BANDIT_START);
+  const [delta7Pos, setDelta7Pos] = useState(DELTA7_START);
+  
+  const banditRef = useRef(BANDIT_START);
+  const delta7Ref = useRef(DELTA7_START);
+  const phaseRef = useRef('IDLE');
   
   const perimTimerRef = useRef(null);
 
   useEffect(() => {
-    let timer;
-    if (interceptPhase === 'ENGAGING') {
-      timer = setInterval(() => {
-        setDistance(prev => {
-          const next = prev - 0.1;
-          if (next <= 0) {
-            setInterceptPhase('SUCCESS');
-            return 0;
-          }
-          return next;
-        });
-
-        // Move drones toward center intercept point (x:60, y:30)
-        setBanditPos(prev => ({
-          x: prev.x + (60 - prev.x) * 0.05,
-          y: prev.y + (30 - prev.y) * 0.05
-        }));
-        
-        setFriendlyPos(prev => ({
-          x: prev.x + (60 - prev.x) * 0.08, // Friendly moves slightly faster
-          y: prev.y + (30 - prev.y) * 0.08
-        }));
-
-      }, 200);
-    }
-    
-    return () => {
-      clearInterval(timer);
-    };
+    phaseRef.current = interceptPhase;
   }, [interceptPhase]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      // 1. Always move BANDIT towards base [28.5900, 77.1900]
+      const BANDIT_SPEED = 0.00003;
+      const bDx = 28.5900 - banditRef.current.lat;
+      const bDy = 77.1900 - banditRef.current.lng;
+      const bDist = Math.sqrt(bDx*bDx + bDy*bDy);
+      
+      if (bDist > 0.0001) {
+        banditRef.current = {
+          lat: banditRef.current.lat + (bDx/bDist) * BANDIT_SPEED,
+          lng: banditRef.current.lng + (bDy/bDist) * BANDIT_SPEED
+        };
+        setBanditPos(banditRef.current);
+      }
+
+      // 2. Move DELTA-7 to intercept if ENGAGING
+      if (phaseRef.current === 'ENGAGING') {
+        const DELTA_SPEED = 0.000045;
+        const fDx = banditRef.current.lat - delta7Ref.current.lat;
+        const fDy = banditRef.current.lng - delta7Ref.current.lng;
+        const fDist = Math.sqrt(fDx*fDx + fDy*fDy);
+        
+        if (fDist < 0.0005) {
+          setInterceptPhase('SUCCESS');
+        } else {
+          delta7Ref.current = {
+            lat: delta7Ref.current.lat + (fDx/fDist) * DELTA_SPEED,
+            lng: delta7Ref.current.lng + (fDy/fDist) * DELTA_SPEED
+          };
+          setDelta7Pos(delta7Ref.current);
+        }
+
+        // Calculate real distance in km
+        const realDistance = L.latLng(banditRef.current).distanceTo(L.latLng(delta7Ref.current)) / 1000;
+        setDistance(realDistance);
+      }
+    }, 200);
+    
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (perimTimerRef.current) clearInterval(perimTimerRef.current);
@@ -83,6 +106,33 @@ export default function StrikePortalAir() {
     setEta(80);
     setInterceptPhase('ENGAGING');
   };
+
+  const banditIcon = L.divIcon({
+    className: 'custom-bandit-icon',
+    html: `<div style="position:relative;">
+      <svg width="32" height="32" viewBox="0 0 32 32">
+        <polygon points="16,2 28,28 16,22 4,28" fill="#FF2D2D" opacity=".9" transform="rotate(130,16,16)"/>
+        <circle cx="16" cy="16" r="4" fill="none" stroke="#FF2D2D" stroke-width="1.5"/>
+      </svg>
+      <div style="position:absolute;top:-14px;left:34px;font-family:monospace;font-size:9px;
+        color:#FF2D2D;white-space:nowrap;background:#08090Cdd;padding:1px 5px;
+        border:1px solid #FF2D2D55;">BANDIT-01 | ALT: 180m</div>
+    </div>`,
+    iconSize:[32,32], iconAnchor:[16,16]
+  });
+
+  const delta7Icon = L.divIcon({
+    className: 'custom-delta7-icon',
+    html: `<div style="position:relative;">
+      <svg width="26" height="26" viewBox="0 0 26 26">
+        <polygon points="13,2 23,24 13,19 3,24" fill="#00FF88" opacity=".9" transform="rotate(45,13,13)"/>
+      </svg>
+      <div style="position:absolute;top:-14px;left:28px;font-family:monospace;font-size:9px;
+        color:#00FF88;white-space:nowrap;background:#08090Cdd;padding:1px 5px;
+        border:1px solid #00FF8855;">DELTA-7</div>
+    </div>`,
+    iconSize:[26,26], iconAnchor:[13,13]
+  });
 
   return (
     <div style={{ display: 'flex', gap: '24px', height: '100%', width: '100%', boxSizing: 'border-box' }}>
@@ -130,104 +180,35 @@ export default function StrikePortalAir() {
           </div>
         </div>
 
-        {/* Map Grid Background */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          backgroundImage: `
-            linear-gradient(to right, ${COLORS.border}40 1px, transparent 1px),
-            linear-gradient(to bottom, ${COLORS.border}40 1px, transparent 1px)
-          `,
-          backgroundSize: '40px 40px',
-          zIndex: 1
-        }} />
-
-        {/* Map Elements Canvas */}
-        <div style={{ position: 'absolute', inset: 0, zIndex: 5 }}>
-          
-          {/* Bandit Threat Radius */}
-          <div style={{
-            position: 'absolute',
-            left: `${banditPos.x}%`, top: `${banditPos.y}%`,
-            width: '240px', height: '240px',
-            transform: 'translate(-50%, -50%)',
-            backgroundColor: `${COLORS.dangerRed}10`,
-            border: `1px dashed ${COLORS.dangerRed}60`,
-            borderRadius: '50%',
-            pointerEvents: 'none',
-            transition: 'all 0.2s linear'
-          }} />
-
-          {/* Engagement Arc (shows when engaging) */}
-          {interceptPhase === 'ENGAGING' && (
-            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-              <line 
-                x1={`${friendlyPos.x}%`} y1={`${friendlyPos.y}%`} 
-                x2={`${banditPos.x}%`} y2={`${banditPos.y}%`} 
-                stroke={COLORS.accentGreen} 
-                strokeWidth="2" 
-                strokeDasharray="4 4"
-                style={{ opacity: 0.6, transition: 'all 0.2s linear' }}
+        {/* Real Leaflet Map */}
+        <div style={{ flex: 1, position: 'relative' }}>
+          <MapContainer 
+            center={[28.6130, 77.2070]} 
+            zoom={13} 
+            zoomControl={false} 
+            attributionControl={false}
+            style={{ width: '100%', height: '100%', backgroundColor: '#000' }}
+          >
+            <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" opacity={0.2} />
+            
+            <Circle 
+              center={banditPos} 
+              radius={1500} 
+              pathOptions={{ color: '#FF2D2D', weight: 1, fillColor: '#FF2D2D', fillOpacity: 0.08, dashArray: '6 4' }} 
+            />
+            
+            {interceptPhase === 'ENGAGING' && (
+              <Polyline 
+                positions={[delta7Pos, banditPos]} 
+                pathOptions={{ color: COLORS.accentGreen, weight: 2, dashArray: '4 4', opacity: 0.6 }} 
               />
-            </svg>
-          )}
-
-          {/* Enemy Drone */}
-          <div style={{
-            position: 'absolute',
-            left: `${banditPos.x}%`, top: `${banditPos.y}%`,
-            transform: 'translate(-50%, -50%)',
-            transition: 'all 0.2s linear',
-            display: 'flex', flexDirection: 'column', alignItems: 'center'
-          }}>
-            <div style={{
-              width: '40px', height: '40px',
-              border: `1px solid ${COLORS.dangerRed}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backgroundColor: `${COLORS.dangerRed}20`,
-              position: 'relative'
-            }}>
-              <Navigation size={20} color={COLORS.dangerRed} style={{ transform: 'rotate(130deg)' }} />
-              {interceptPhase !== 'SUCCESS' && (
-                <div style={{
-                  position: 'absolute', inset: '-4px', border: `1px solid ${COLORS.dangerRed}`,
-                  animation: 'pulseRing 1.5s infinite', borderRadius: '50%'
-                }} />
-              )}
-            </div>
-            <div style={{
-              marginTop: '8px',
-              backgroundColor: '#000000', border: `1px solid ${COLORS.border}`, padding: '4px 8px',
-              fontFamily: FONT_MONO, fontSize: '10px', color: COLORS.dangerRed, textAlign: 'center', whiteSpace: 'nowrap'
-            }}>
-              BANDIT-01 | ALT: 180m<br/>BRG: 042°
-            </div>
-          </div>
-
-          {/* Friendly Drone */}
-          <div style={{
-            position: 'absolute',
-            left: `${friendlyPos.x}%`, top: `${friendlyPos.y}%`,
-            transform: 'translate(-50%, -50%)',
-            transition: 'all 0.2s linear',
-            display: 'flex', flexDirection: 'column', alignItems: 'center'
-          }}>
-            <div style={{
-              width: '40px', height: '40px',
-              border: `1px solid ${COLORS.accentGreen}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backgroundColor: `${COLORS.accentGreen}20`
-            }}>
-              <Navigation size={20} color={COLORS.accentGreen} style={{ transform: 'rotate(45deg)' }} />
-            </div>
-            <div style={{
-              marginTop: '8px',
-              backgroundColor: '#000000', border: `1px solid ${COLORS.accentGreen}60`, padding: '4px 8px',
-              fontFamily: FONT_MONO, fontSize: '10px', color: COLORS.accentGreen, textAlign: 'center', whiteSpace: 'nowrap'
-            }}>
-              DELTA-7<br/>
-              {interceptPhase === 'ENGAGING' ? 'INTERCEPTING' : interceptPhase === 'SUCCESS' ? 'INTERCEPT ACHIEVED' : 'STANDBY'}
-            </div>
-          </div>
+            )}
+            
+            <Marker position={banditPos} icon={banditIcon} />
+            <Marker position={delta7Pos} icon={delta7Icon} />
+            
+          </MapContainer>
         </div>
       </div>
 
@@ -336,7 +317,15 @@ export default function StrikePortalAir() {
                 <div style={{ fontFamily: FONT_MONO, fontSize: '16px', color: COLORS.accentGreen, fontWeight: 'bold', letterSpacing: '1px' }}>
                   INTERCEPT ACHIEVED
                 </div>
-                <button onClick={() => { setInterceptPhase('IDLE'); setEta(80); setBanditPos({x:80, y:15}); setFriendlyPos({x:20, y:85}); setDistance(4.2); }}
+                <button onClick={() => { 
+                  setInterceptPhase('IDLE'); 
+                  setEta(80); 
+                  banditRef.current = BANDIT_START;
+                  delta7Ref.current = DELTA7_START;
+                  setBanditPos(BANDIT_START); 
+                  setDelta7Pos(DELTA7_START); 
+                  setDistance(4.2); 
+                }}
                   style={{ marginTop:12, padding:`6px 16px`, background:`transparent`, border:`1px solid #1E2530`, color:`#556070`, fontFamily:FONT_MONO, fontSize:11, cursor:`pointer`, letterSpacing:1 }}>
                   RESET FOR NEW INTERCEPT
                 </button>

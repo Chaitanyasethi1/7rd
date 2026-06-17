@@ -55,12 +55,9 @@ function TopBar({ screen, utcTime }) {
       </button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 8 }}>
-        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke={C.textPri} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round">
-          <path d="M4 8h8l-4 14m4 -14h6a4 4 0 0 1 0 8h-4l3 7m-3 -7h-2" />
-          <polygon points="1,14 16,30 31,14 26,4 6,4" strokeWidth="1.5" strokeOpacity="0.4" />
-        </svg>
-        <div style={{ fontFamily:"'Inter', sans-serif", fontSize:13, fontWeight:800, color:C.textPri, letterSpacing:3 }}>
-          BRAHMA—C2
+        <img src="/logo.svg" alt="Logo" style={{ width: 28, height: 28, filter: 'brightness(0) invert(1)' }} />
+        <div style={{ fontFamily:"'Inter', sans-serif", fontSize:15, fontWeight:800, color:C.textPri, letterSpacing:1.5 }}>
+          SEVEN ROUNDS DEFENDER
         </div>
       </div>
 
