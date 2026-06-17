@@ -84,7 +84,7 @@ export default function Sidebar({ screen, setScreen }) {
               className={`nav-item ${isCollapsed ? 'collapsed' : ''}`}
               data-tooltip={item.label}
               onClick={() => setScreen(item.id)}
-              onMouseEnter={(e) => isCollapsed && setActiveTooltip({ label: item.label, top: e.currentTarget.getBoundingClientRect().top + 10 })}
+              onMouseEnter={(e) => { setActiveTooltip(null); if (isCollapsed) setActiveTooltip({ label: item.label, top: e.currentTarget.getBoundingClientRect().top + 10 }); }}
               onMouseLeave={() => setActiveTooltip(null)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px',
@@ -129,8 +129,8 @@ export default function Sidebar({ screen, setScreen }) {
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: sys.status }} />
             <div className="nav-section-label" style={{ 
               fontSize: 8, color: C.textMuted, fontFamily: 'monospace',
-              opacity: isCollapsed ? 0 : 1, transition: 'opacity 0.12s ease',
-              width: isCollapsed ? 0 : 'auto', overflow: 'hidden'
+              opacity: isCollapsed ? 0 : 1, transition: 'max-width 0.12s ease, opacity 0.12s ease',
+              maxWidth: isCollapsed ? 0 : 60, overflow: 'hidden'
             }}>
               {sys.label}
             </div>
