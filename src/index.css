@@ -69,4 +69,4 @@ button:active { transform: scale(0.97); }
 .nav-badge { animation: badge-pulse 2s ease-in-out infinite; transform-origin: center; }
 @keyframes badge-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.92); } }
 
-@keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+@keyframes ticker-scroll { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }

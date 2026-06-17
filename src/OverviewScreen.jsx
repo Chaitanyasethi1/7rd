@@ -249,8 +249,7 @@ export default function OverviewScreen({ setScreen }) {
         <div style={{ flex: 1, overflow: 'hidden', position: 'relative', height: '100%', whiteSpace: 'nowrap' }}>
           <div style={{
             position: 'absolute', whiteSpace: 'nowrap', display: 'inline-block', alignItems: 'center', height: '100%',
-            animation: 'ticker-scroll 18s linear infinite', color: COLORS.dangerRed, fontFamily: FONT_MONO, fontSize: '10px',
-            paddingLeft: '100%', paddingTop: '10px'
+            animation: 'ticker-scroll 22s linear infinite', color: COLORS.dangerRed, fontFamily: FONT_MONO, fontSize: '10px'
           }}>
             BANDIT-01 BRG:042° ALT:180m &nbsp;&nbsp;|&nbsp;&nbsp; BANDIT-02 BRG:228° ALT:240m &nbsp;&nbsp;|&nbsp;&nbsp; TGT-03 UNENGAGED
           </div>
@@ -269,18 +268,19 @@ export default function OverviewScreen({ setScreen }) {
         
         {/* Addition 3: Mini Tactical Map Thumbnail */}
         <div id="overview-minimap" style={{
-          flex: 1, backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`,
-          position: 'relative', display: 'flex', flexDirection: 'column'
+          backgroundColor: COLORS.surface, border: `1px solid ${COLORS.border}`,
+          position: 'relative', display: 'flex', flexDirection: 'column',
+          height: '260px', minHeight: '260px', flexShrink: 0
         }}>
           <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 400, fontFamily: FONT_SANS, fontSize: '9px', color: COLORS.textMuted, letterSpacing: 1, textTransform: 'uppercase', background: 'rgba(0,0,0,0.5)', padding: '2px 6px' }}>
             AREA OF OPERATIONS — OVERVIEW
           </div>
           <MapContainer 
-            whenReady={(map) => { setTimeout(() => { map.target.invalidateSize(); }, 150); }}
+            whenReady={(map) => { setTimeout(() => { map.target.invalidateSize(); }, 300); }}
             center={[28.4650, 77.0300]} 
             zoom={12} 
             zoomControl={false} scrollWheelZoom={false} dragging={false} doubleClickZoom={false}
-            style={{ width: '100%', height: '100%', minHeight: '220px', backgroundColor: '#000' }}
+            style={{ width: '100%', height: '220px', backgroundColor: '#000' }}
           >
             <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
             {/* Mock ground target */}
