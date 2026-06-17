@@ -101,7 +101,7 @@ const StatCard = ({ id, title, value, color, icon: Icon, diff, isFlashing }) => 
   );
 };
 
-export default function OverviewScreen({ setScreen }) {
+export default function OverviewScreen({ setScreen, wsStatUpdate, wsLogUpdate }) {
   // Stats State
   const [stats, setStats] = useState([
     { id: 'sc-identified', title: 'TARGETS IDENTIFIED', value: 7, color: COLORS.accentAmber, icon: Eye, diff: 2, flash: false },
@@ -211,18 +211,25 @@ export default function OverviewScreen({ setScreen }) {
     addLogEvent(null, 'Mission log exported — ' + logEvents.length + ' entries', 'info');
   };
 
-  // Listen for WS Simulator events (BUG 3 Fix)
+  // Listen for WS Simulator events via props
   useEffect(() => {
-    const onWs = (e) => {
-      const msg = e.detail;
-      if (msg.type === 'log') addLogEvent(msg.ts, msg.text, msg.severity);
-      if (msg.type === 'stat') {
-        setStats(prev => prev.map(s => s.id === `sc-${msg.key}` ? { ...s, value: msg.value, flash: true } : s));
-      }
-    };
-    window.addEventListener('ws-message', onWs);
-    return () => window.removeEventListener('ws-message', onWs);
-  }, []);
+    if (!wsStatUpdate) return;
+    setStats(cards => cards.map(card =>
+      card.id === `sc-${wsStatUpdate.key}` 
+        ? { ...card, value: wsStatUpdate.value, diff: wsStatUpdate.value - card.value, flash: true }
+        : card
+    ));
+    setTimeout(() => {
+      setStats(cards => cards.map(card =>
+        card.id === `sc-${wsStatUpdate.key}` ? { ...card, flash: false } : card
+      ));
+    }, 600);
+  }, [wsStatUpdate]);
+
+  useEffect(() => {
+    if (!wsLogUpdate) return;
+    addLogEvent(wsLogUpdate.ts, wsLogUpdate.text, wsLogUpdate.sev);
+  }, [wsLogUpdate]);
 
   return (
     <div style={{ 

@@ -115,6 +115,22 @@ function ThreatBar() {
 export default function AppShell() {
   const [screen, setScreen] = useState("ground");
   const [utcTime, setUtcTime] = useState("");
+  const [globalStats, setGlobalStats] = useState(null);
+  const [globalLog, setGlobalLog] = useState(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const msg = e.detail;
+      if (msg.type === 'stat') {
+        setGlobalStats({ key: msg.key, value: msg.value, ts: Date.now() });
+      }
+      if (msg.type === 'log') {
+        setGlobalLog({ ts: msg.ts, text: msg.text, sev: msg.severity, id: Date.now() });
+      }
+    };
+    window.addEventListener('ws-message', handler);
+    return () => window.removeEventListener('ws-message', handler);
+  }, []);
 
   useEffect(() => {
     const tick = () => {
@@ -141,7 +157,7 @@ export default function AppShell() {
         <Sidebar screen={screen} setScreen={setScreen} />
         
         <div style={{ flex:1, display:"flex", overflow:"hidden", position:"relative", minWidth: 0 }}>
-          {screen==="overview" && <OverviewScreen setScreen={setScreen} />}
+          {screen==="overview" && <OverviewScreen setScreen={setScreen} wsStatUpdate={globalStats} wsLogUpdate={globalLog} />}
           {screen==="air"      && <StrikePortalAir />}
           {screen==="ground"   && <GroundStrikeScreen />}
         </div>
