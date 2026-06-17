@@ -176,6 +176,7 @@ function MapPanel({ targets, setTargets, selectedTarget, setSelectedTarget, lock
   const explosionRef = useRef(null);
   const currentTileLayer = useRef(null);
   const targetMarkers = useRef([]);
+  const customClickRef = useRef(null);
   
   const [mapLayer, setMapLayer] = useState("SAT");
   const [customMode, setCustomMode] = useState(false);
@@ -397,41 +398,50 @@ function MapPanel({ targets, setTargets, selectedTarget, setSelectedTarget, lock
     if (!lMap.current) return;
     const map = lMap.current;
 
-    const onMapClick = (e) => {
-      if (!customMode) return;
-      const customTgt = {
-        id: 'CUSTOM-' + Date.now().toString().slice(-4),
-        lat: e.latlng.lat, lng: e.latlng.lng,
-        type: 'CUSTOM POINT', conf: 100, priority: 'MANUAL', threat: 'MOD', label: "USER DESIGNATED"
-      };
-      setTargets(prev => [...prev, customTgt]);
-      setSelectedTarget(customTgt);
-      setLockPhase("select");
-      setCustomMode(false);
-      map.getContainer().style.cursor = '';
-    };
-
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape' && customMode) {
-        setCustomMode(false);
-        map.getContainer().style.cursor = '';
-      }
-    };
+    // Always clean up previous handler first
+    if (customClickRef.current) {
+      map.off('click', customClickRef.current);
+      customClickRef.current = null;
+    }
 
     if (customMode) {
       map.getContainer().style.cursor = 'crosshair';
-      map.on('click', onMapClick);
-      document.addEventListener('keydown', onKeyDown);
+      const handler = (e) => {
+        const newTarget = {
+          id: 'CUSTOM-' + Date.now().toString().slice(-4),
+          lat: e.latlng.lat, lng: e.latlng.lng,
+          type: 'CUSTOM POINT', conf: 100, priority: 'MANUAL', threat: 'MOD', label: "USER DESIGNATED"
+        };
+        setTargets(prev => [...prev, newTarget]);
+        setSelectedTarget(newTarget);
+        setLockPhase("select");
+        setCustomMode(false);
+        map.getContainer().style.cursor = '';
+        map.off('click', handler);
+        customClickRef.current = null;
+      };
+      customClickRef.current = handler;
+      map.on('click', handler);
     } else {
       map.getContainer().style.cursor = '';
-      map.off('click', onMapClick);
-      document.removeEventListener('keydown', onKeyDown);
     }
 
     return () => {
-      map.off('click', onMapClick);
-      document.removeEventListener('keydown', onKeyDown);
+      if (customClickRef.current) {
+        map.off('click', customClickRef.current);
+        customClickRef.current = null;
+      }
     };
+  }, [customMode]);
+
+  useEffect(() => {
+    const onKey = (e) => { 
+      if (e.key === 'Escape' && customMode) { 
+        setCustomMode(false); 
+      } 
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [customMode]);
 
   return (
