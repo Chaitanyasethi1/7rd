@@ -25,6 +25,8 @@ export default function StrikePortalAir() {
   // Drone Coordinates (Percentages for map overlay)
   const [banditPos, setBanditPos] = useState({ x: 80, y: 15 });
   const [friendlyPos, setFriendlyPos] = useState({ x: 20, y: 85 });
+  
+  const perimTimerRef = useRef(null);
 
   useEffect(() => {
     let timer;
@@ -53,17 +55,20 @@ export default function StrikePortalAir() {
       }, 200);
     }
     
-    // ETA countdown
-    let etaTimer;
+    return () => {
+      clearInterval(timer);
+    };
+  }, [interceptPhase]);
+
+  useEffect(() => {
+    if (perimTimerRef.current) clearInterval(perimTimerRef.current);
     if (interceptPhase !== 'SUCCESS') {
-      etaTimer = setInterval(() => {
+      perimTimerRef.current = setInterval(() => {
         setEta(prev => (prev > 0 ? prev - 1 : 0));
       }, 1000);
     }
-
     return () => {
-      clearInterval(timer);
-      clearInterval(etaTimer);
+      if (perimTimerRef.current) clearInterval(perimTimerRef.current);
     };
   }, [interceptPhase]);
 
@@ -75,6 +80,7 @@ export default function StrikePortalAir() {
 
   const engageTarget = () => {
     setShowConfirm(false);
+    setEta(80);
     setInterceptPhase('ENGAGING');
   };
 
@@ -330,6 +336,10 @@ export default function StrikePortalAir() {
                 <div style={{ fontFamily: FONT_MONO, fontSize: '16px', color: COLORS.accentGreen, fontWeight: 'bold', letterSpacing: '1px' }}>
                   INTERCEPT ACHIEVED
                 </div>
+                <button onClick={() => { setInterceptPhase('IDLE'); setEta(80); setBanditPos({x:80, y:15}); setFriendlyPos({x:20, y:85}); setDistance(4.2); }}
+                  style={{ marginTop:12, padding:`6px 16px`, background:`transparent`, border:`1px solid #1E2530`, color:`#556070`, fontFamily:FONT_MONO, fontSize:11, cursor:`pointer`, letterSpacing:1 }}>
+                  RESET FOR NEW INTERCEPT
+                </button>
               </div>
             )}
           </div>
