@@ -49,7 +49,7 @@ function TopBar({ screen, utcTime }) {
         window.dispatchEvent(new CustomEvent('ws-message', { detail: msg }));
       }} style={{
         fontFamily:"monospace", fontSize:9, color:"#FFB300", border:"1px solid #FFB30044", 
-        background:"none", padding:"2px 8px", cursor:"pointer"
+        background:"none", padding:"2px 8px", cursor:"pointer", WebkitAppRegion: 'no-drag'
       }}>
         WS DEMO
       </button>
@@ -59,8 +59,8 @@ function TopBar({ screen, utcTime }) {
           <path d="M4 8h8l-4 14m4 -14h6a4 4 0 0 1 0 8h-4l3 7m-3 -7h-2" />
           <polygon points="1,14 16,30 31,14 26,4 6,4" strokeWidth="1.5" strokeOpacity="0.4" />
         </svg>
-        <div style={{ fontFamily:"'Inter', sans-serif", fontSize:15, fontWeight:800, color:C.textPri, letterSpacing:1.5 }}>
-          SEVEN ROUNDS DEFENDER
+        <div style={{ fontFamily:"'Inter', sans-serif", fontSize:13, fontWeight:800, color:C.textPri, letterSpacing:3 }}>
+          BRAHMA—C2
         </div>
       </div>
 
@@ -160,6 +160,38 @@ export default function AppShell() {
           {screen==="overview" && <OverviewScreen setScreen={setScreen} wsStatUpdate={globalStats} wsLogUpdate={globalLog} />}
           {screen==="air"      && <StrikePortalAir />}
           {screen==="ground"   && <GroundStrikeScreen />}
+          
+          {screen === 'system' && (
+            <div style={{ flex:1, display:'flex', flexDirection:'column', padding:16, gap:12, overflow:'hidden', fontFamily:'monospace' }}>
+              <div style={{ fontSize:10, color:'#4A5A70', letterSpacing:2, marginBottom:8 }}>SYSTEM HEALTH MONITOR</div>
+              
+              {/* System status grid */}
+              {[
+                { label:'GPS RECEIVER',      status:'OPERATIONAL', sub:'WGS-84 LOCK | SATS: 12', col:'#00FF88' },
+                { label:'COMMS LINK',        status:'ENCRYPTED',   sub:'SATCOM STRONG | AES-256', col:'#00FF88' },
+                { label:'AI TARGETING ENGINE', status:'ACTIVE',    sub:'NVIDIA JETSON | 94% CONF', col:'#00FF88' },
+                { label:'EO/IR PAYLOAD',     status:'ARMED',       sub:'GIMBAL TRACKING | IR MODE', col:'#FFB300' },
+                { label:'NAG MISSILE BUS',   status:'READY',       sub:'2x LOADED | SAFETY: OFF', col:'#FF2D2D' },
+                { label:'DATA LINK',         status:'NOMINAL',     sub:'BANDWIDTH: 42 Mbps', col:'#00FF88' },
+              ].map(s => (
+                <div key={s.label} style={{ background:'#0E1116', border:`1px solid #1C2330`, padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div>
+                    <div style={{ fontSize:10, color:'#D8E4F0', fontWeight:700, letterSpacing:.5, marginBottom:3 }}>{s.label}</div>
+                    <div style={{ fontSize:8, color:'#4A5A70', letterSpacing:.3 }}>{s.sub}</div>
+                  </div>
+                  <div style={{ fontSize:9, color:s.col, border:`1px solid ${s.col}44`, padding:'2px 8px', fontWeight:700 }}>{s.status}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {screen === 'video' && (
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', 
+              flexDirection:'column', gap:12, fontFamily:'monospace' }}>
+              <div style={{ fontSize:10, color:'#4A5A70', letterSpacing:2 }}>VIDEO FEEDS</div>
+              <div style={{ fontSize:8, color:'#1C2836' }}>PRIMARY FEEDS ARE IN THE RIGHT PANEL →</div>
+            </div>
+          )}
         </div>
         <LiveVideoPanel />
       </div>
