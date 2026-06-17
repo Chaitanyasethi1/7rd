@@ -59,7 +59,7 @@ button:active { transform: scale(0.97); }
 .brahma-popup .leaflet-popup-tip { background: #121820; }
 @keyframes ring-pulse { 0% { opacity: 0.8; } 50% { opacity: 0.3; } 100% { opacity: 0.8; } }
 .target-pulse-ring { animation: ring-pulse 1.2s ease infinite; }
-.animated-strike-line { stroke-dasharray: 12 8 !important; animation: strike-flow 0.6s linear infinite; }
+.animated-strike-line { stroke-dasharray: 12 8 !important; animation: strike-flow 0.6s linear infinite !important; }
 @keyframes strike-flow { to { stroke-dashoffset: -20; } }
 .lock-tooltip { background: #121820; border: 1px solid #FF3344; color: #FF3344; font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 2px 6px; border-radius: 0; }
 

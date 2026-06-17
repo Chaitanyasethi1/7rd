@@ -335,17 +335,16 @@ function MapPanel({ targets, setTargets, selectedTarget, setSelectedTarget, lock
     const col = lockPhase === "locked" || lockPhase === "authorized" ? C.red : C.amber;
     lineRef.current = L.polyline(
       [[OUR_DRONE.lat, OUR_DRONE.lng],[selectedTarget.lat, selectedTarget.lng]],
-      { color:col, weight:2, className: 'animated-strike-line', opacity:.9 }
+      { color:col, weight:2, opacity:.9, dashArray: '12 8' }
     ).addTo(lMap.current);
 
     // BUG 3 Fix: Force CSS animation onto the SVG path element
     setTimeout(() => {
       const el = lineRef.current?.getElement();
       if (el) {
-        el.style.strokeDasharray = '12 8';
-        el.style.animation = 'strike-flow 0.5s linear infinite';
+        el.classList.add('animated-strike-line');
       }
-    }, 100);
+    }, 150);
 
     // Enh 6: Target Lock Cinematic Feedback
     if (lockPhase === "locked" || lockPhase === "authorized") {
@@ -358,9 +357,11 @@ function MapPanel({ targets, setTargets, selectedTarget, setSelectedTarget, lock
         radius: 150, color: '#FF3344', fillColor: '#FF3344', fillOpacity: 0.08, weight: 2, dashArray: 'none'
       }).addTo(lMap.current);
 
-      lockTooltipRef.current = L.tooltip([selectedTarget.lat, selectedTarget.lng], {
-        content: "🔒 LOCKED", permanent: true, direction: 'top', className: 'lock-tooltip'
-      }).addTo(lMap.current);
+      const lockMarker = L.divIcon({ 
+        html:`<div style="font-family:monospace;font-size:10px;color:#FF3344;background:#121820;border:1px solid #FF3344;padding:2px 6px;">🔒 LOCKED</div>`,
+        iconSize:[70,20], iconAnchor:[35,30], className:""
+      });
+      lockTooltipRef.current = L.marker([selectedTarget.lat, selectedTarget.lng], { icon:lockMarker, zIndexOffset:2000 }).addTo(lMap.current);
     }
   }, [selectedTarget, lockPhase]);
 
